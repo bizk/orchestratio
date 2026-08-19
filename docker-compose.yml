@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-orchestratio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orchestratio}
+      POSTGRES_DB: ${POSTGRES_DB:-orchestratio}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-orchestratio} -d ${POSTGRES_DB:-orchestratio}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgres://${POSTGRES_USER:-orchestratio}:${POSTGRES_PASSWORD:-orchestratio}@db:5432/${POSTGRES_DB:-orchestratio}?sslmode=disable
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    build:
+      context: ./app/orchestratus
+      dockerfile: Dockerfile
+    ports:
+      - "${APP_PORT:-5173}:5173"
+    volumes:
+      - ./app/orchestratus/src:/app/src
+      - ./app/orchestratus/public:/app/public
+      - ./app/orchestratus/index.html:/app/index.html
+    depends_on:
+      - server
+
+volumes:
+  postgres_data:
