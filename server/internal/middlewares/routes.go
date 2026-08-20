@@ -33,6 +33,10 @@ func RegisterRoutes(r *gin.Engine) {
 				}
 			}
 		}
-
+		agents := api.Group("/agent")
+		{
+			agents.POST("", handlers.CreateAgent)
+			agents.GET("/:agentId", handlers.GetAgentByID)
+		}
 	}
 }

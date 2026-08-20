@@ -2,13 +2,13 @@ package main
 
 import (
 	"log"
+	"orchestratio/internal/config"
+	"orchestratio/internal/db"
 	"orchestratio/internal/middlewares"
-	"orchestratio/internal/models"
+	openhands "orchestratio/internal/services/open-hands"
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 )
 
 func main() {
@@ -17,24 +17,23 @@ func main() {
 		port = "8080"
 	}
 
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		log.Fatal("DATABASE_URL is required")
-	}
-
-	db, err := gorm.Open(postgres.Open(dbURL), &gorm.Config{})
+	config, err := config.Load()
 	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+		log.Fatalf("failed to load configuration: %v", err)
 	}
 
-	if err := db.AutoMigrate(&models.Project{}, &models.Task{}); err != nil {
-		log.Fatalf("failed to migrate database: %v", err)
+	db, err := db.InitDB(config.DatabaseURL)
+	if err != nil {
+		log.Fatalf("failed to initialize database: %v", err)
 	}
+
+	openHandsService := openhands.NewOpenHandsService(config.OpenHandsAPIKey, config.OpenHandsBaseURL)
 
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 	r.Use(func(c *gin.Context) {
 		c.Set("db", db)
+		c.Set("openHandsService", openHandsService)
 		c.Next()
 	})
 
