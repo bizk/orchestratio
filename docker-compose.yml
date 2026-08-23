@@ -44,6 +44,7 @@ services:
       - ./app/orchestratus/src:/app/src
       - ./app/orchestratus/public:/app/public
       - ./app/orchestratus/index.html:/app/index.html
+      - ./app/orchestratus/vite.config.ts:/app/vite.config.ts
     depends_on:
       - server
 

@@ -10,7 +10,10 @@ export default defineConfig({
   ],
   server: {
     proxy: {
-      '/health': process.env.VITE_BACKEND_URL ?? 'http://localhost:8080',
+      '/health': {
+        target: process.env.VITE_BACKEND_URL ?? 'http://localhost:8080',
+        changeOrigin: true,
+      },
     },
   },
 })
