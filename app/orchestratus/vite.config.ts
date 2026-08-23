@@ -8,4 +8,9 @@ export default defineConfig({
     react(),
     babel({ presets: [reactCompilerPreset()] })
   ],
+  server: {
+    proxy: {
+      '/health': process.env.VITE_BACKEND_URL ?? 'http://localhost:8080',
+    },
+  },
 })
