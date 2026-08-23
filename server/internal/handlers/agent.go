@@ -14,13 +14,13 @@ func CreateAgent(c *gin.Context) {
 
 	agentResponse, err := openHandsService.StartConversation(c.Request.Context(), openhands.StartConversationRequest{
 		InitialMessage: &openhands.InitialMessage{
-			Content: []openhands.TextContent{{Type: "text", Text: "Fix the flaky test in auth"}},
+			Content: []openhands.TextContent{{Type: "text", Text: "Create a PR that connects the /health endpoint from the backend into the frontend and shows it in the UI, keep changes minimal and so it works locally"}},
 		},
-		SelectedRepository:  "bizk/orchestratus",
-		SelectedBranch:      "main",
-		Title:               "Test",
-		AgentType:           "default",
-		SystemMessageSuffix: "Give me a summary of the conversation.",
+		SelectedRepository: "bizk/orchestratus",
+		SelectedBranch:     "main",
+		Title:              "Test",
+		AgentType:          "default",
+		// SystemMessageSuffix: "Give me a summary of the conversation.",
 	})
 
 	if err != nil {
