@@ -1,51 +1,68 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
 
-	openhands "orchestratio/internal/services/open-hands"
+	"orchestratio/internal/models"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func CreateAgent(c *gin.Context) {
-	openHandsService := c.MustGet("openHandsService").(*openhands.OpenHandsService)
+	db := c.MustGet("db").(*gorm.DB)
 
-	agentResponse, err := openHandsService.StartConversation(c.Request.Context(), openhands.StartConversationRequest{
-		InitialMessage: &openhands.InitialMessage{
-			Content: []openhands.TextContent{{Type: "text", Text: "Fix the flaky test in auth"}},
-		},
-		SelectedRepository:  "bizk/orchestratus",
-		SelectedBranch:      "main",
-		Title:               "Test",
-		AgentType:           "default",
-		SystemMessageSuffix: "Give me a summary of the conversation.",
-	})
+	var req struct {
+		Name        string `json:"name" binding:"required"`
+		Description string `json:"description" binding:"required"`
+	}
 
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	name := req.Name
+	description := req.Description
+
+	agent := models.Agent{
+		Name:        name,
+		Description: description,
+	}
+
+	if err := db.Create(&agent).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, agent)
+}
+
+func ListAgents(c *gin.Context) {
+	db := c.MustGet("db").(*gorm.DB)
+
+	agents := []models.Agent{}
+	err := db.Model(&models.Agent{}).Find(&agents).Error
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, agentResponse)
+	c.JSON(http.StatusOK, agents)
 }
 
 func GetAgentByID(c *gin.Context) {
-	openHandsService := c.MustGet("openHandsService").(*openhands.OpenHandsService)
+	db := c.MustGet("db").(*gorm.DB)
 
-	agentID := c.Param("agentId")
-	if agentID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "agent ID is required"})
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID is required"})
 		return
 	}
 
-	agent, err := openHandsService.GetConversation(c.Request.Context(), agentID)
+	agent := models.Agent{}
+	err := db.Model(&models.Agent{}).Where("id = ?", id).First(&agent).Error
 	if err != nil {
-		if errors.Is(err, openhands.ErrConversationNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-			return
-		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
