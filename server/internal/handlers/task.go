@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"orchestratio/internal/models"
+	openhands "orchestratio/internal/services/open-hands"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -118,4 +119,69 @@ func UpdateTask(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, task)
+}
+
+func RunTask(c *gin.Context) {
+	projectID := c.Param("id")
+	taskID := c.Param("taskId")
+	repositoryName := c.Query("repositoryName")
+
+	var req struct {
+		AgentID string `json:"agentId" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if projectID == "" || taskID == "" || repositoryName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "project ID, task ID and repository name are required"})
+		return
+	}
+
+	agentID := req.AgentID
+
+	branchName := c.Query("branchName")
+	if branchName == "" {
+		branchName = "main"
+	}
+
+	db := c.MustGet("db").(*gorm.DB)
+
+	task := models.Task{}
+	err := db.Model(&models.Task{}).Where("id = ? AND project_id = ?", taskID, projectID).First(&task).Error
+	if err != nil {
+		fmt.Printf("failed to get task: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	agent := models.Agent{}
+	err = db.Model(&models.Agent{}).Where("id = ?", agentID).First(&agent).Error
+	if err != nil {
+		fmt.Printf("failed to get agent: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	openHandsService := c.MustGet("openHandsService").(*openhands.OpenHandsService)
+
+	agentResponse, err := openHandsService.StartConversation(c.Request.Context(), openhands.StartConversationRequest{
+		InitialMessage: &openhands.InitialMessage{
+			Content: []openhands.TextContent{{Type: "text", Text: task.Description}},
+		},
+		SelectedRepository:  repositoryName,
+		SelectedBranch:      branchName,
+		Title:               task.Title,
+		AgentType:           "default",
+		SystemMessageSuffix: agent.Description,
+	})
+
+	if err != nil {
+		fmt.Printf("failed to start conversation: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, agentResponse)
 }
