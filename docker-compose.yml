@@ -36,12 +36,15 @@ services:
     build:
       context: ./app/orchestratus
       dockerfile: Dockerfile
+    environment:
+      VITE_BACKEND_URL: http://server:8080
     ports:
       - "${APP_PORT:-5173}:5173"
     volumes:
       - ./app/orchestratus/src:/app/src
       - ./app/orchestratus/public:/app/public
       - ./app/orchestratus/index.html:/app/index.html
+      - ./app/orchestratus/vite.config.ts:/app/vite.config.ts
     depends_on:
       - server
 

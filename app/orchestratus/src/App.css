@@ -182,3 +182,15 @@
     border-right-color: var(--border);
   }
 }
+
+.health {
+  font-size: 14px;
+
+  &.health-ok {
+    color: #4caf50;
+  }
+
+  &.health-unreachable {
+    color: #e53935;
+  }
+}
