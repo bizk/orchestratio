@@ -28,9 +28,6 @@ func Load() (*Config, error) {
 	if cfg.DatabaseURL == "" {
 		return nil, errors.New("DATABASE_URL is required")
 	}
-	if cfg.OpenHandsAPIKey == "" || cfg.OpenHandsBaseURL == "" {
-		return nil, errors.New("OPEN_HANDS_API_KEY and OPEN_HANDS_BASE_URL are required")
-	}
 
 	return cfg, nil
 }

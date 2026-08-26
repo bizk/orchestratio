@@ -145,3 +145,15 @@
   border-radius: 999px;
   padding: 2px 8px;
 }
+
+.health {
+  font-size: 14px;
+
+  &.health-ok {
+    color: #4caf50;
+  }
+
+  &.health-unreachable {
+    color: #e53935;
+  }
+}

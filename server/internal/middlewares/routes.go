@@ -30,13 +30,15 @@ func RegisterRoutes(r *gin.Engine) {
 					tasks.GET("", handlers.ListTasks)
 					tasks.DELETE("/:taskId", handlers.DeleteTask)
 					tasks.PUT("/:taskId", handlers.UpdateTask)
+					tasks.POST("/:taskId/run", handlers.RunTask)
 				}
 			}
 		}
 		agents := api.Group("/agent")
 		{
 			agents.POST("", handlers.CreateAgent)
-			agents.GET("/:agentId", handlers.GetAgentByID)
+			agents.GET("", handlers.ListAgents)
+			agents.GET("/:id", handlers.GetAgentByID)
 		}
 	}
 }

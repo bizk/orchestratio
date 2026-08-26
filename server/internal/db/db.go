@@ -15,7 +15,7 @@ func InitDB(dbURL string) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	if err := db.AutoMigrate(&models.Project{}, &models.Task{}); err != nil {
+	if err := db.AutoMigrate(&models.Project{}, &models.Task{}, &models.Agent{}); err != nil {
 		log.Printf("failed to migrate database: %v", err)
 		return nil, err
 	}
