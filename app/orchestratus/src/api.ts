@@ -18,8 +18,6 @@ function send<T>(url: string, method: string, body: unknown): Promise<T> {
 
 export const fetchProjects = () => request<Project[]>('/api/project')
 
-export const fetchAgents = () => request<Agent[]>('/api/agent')
-
 export const fetchTasks = (projectId: number) =>
   request<Task[]>(`/api/project/${projectId}/task`)
 
