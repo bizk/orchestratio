@@ -33,3 +33,21 @@ export const updateTaskStatus = (
   taskId: number,
   status: Status,
 ) => send<Task>(`/api/project/${projectId}/task/${taskId}`, 'PUT', { Status: status })
+
+export const fetchAgents = () => request<Agent[]>('/api/agent')
+
+export const runTask = (
+  projectId: number,
+  taskId: number,
+  agentId: string,
+  repositoryName: string,
+  branchName?: string,
+) => {
+  const params = new URLSearchParams({ repositoryName })
+  if (branchName) params.set('branchName', branchName)
+  return send<unknown>(
+    `/api/project/${projectId}/task/${taskId}/run?${params}`,
+    'POST',
+    { agentId },
+  )
+}

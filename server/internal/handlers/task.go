@@ -124,24 +124,26 @@ func UpdateTask(c *gin.Context) {
 func RunTask(c *gin.Context) {
 	projectID := c.Param("id")
 	taskID := c.Param("taskId")
-	repositoryName := c.Query("repositoryName")
 
 	var req struct {
-		AgentID string `json:"agentId" binding:"required"`
+		AgentID        string `json:"agentId" binding:"required"`
+		RepositoryName string `json:"repositoryName" binding:"required"`
+		BranchName     string `json:"branchName"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if projectID == "" || taskID == "" || repositoryName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "project ID, task ID and repository name are required"})
+	if projectID == "" || taskID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "project ID and task ID are required"})
 		return
 	}
 
 	agentID := req.AgentID
+	repositoryName := req.RepositoryName
 
-	branchName := c.Query("branchName")
+	branchName := req.BranchName
 	if branchName == "" {
 		branchName = "main"
 	}
@@ -179,6 +181,12 @@ func RunTask(c *gin.Context) {
 
 	if err != nil {
 		fmt.Printf("failed to start conversation: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := db.Model(&task).Update("status", models.StatusInProgress).Error; err != nil {
+		fmt.Printf("failed to update task status: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
