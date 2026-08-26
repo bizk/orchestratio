@@ -128,12 +128,24 @@
 
   footer {
     display: flex;
+    align-items: center;
     justify-content: space-between;
     margin-top: 10px;
     font-size: 12px;
     font-family: var(--mono);
-    opacity: 0.7;
+
+    .task-meta {
+      display: flex;
+      gap: 8px;
+      opacity: 0.7;
+    }
   }
+}
+
+.btn-run {
+  padding: 2px 10px;
+  font-size: 12px;
+  opacity: 1;
 }
 
 .badge-approved {
@@ -268,4 +280,10 @@
   justify-content: flex-end;
   gap: 10px;
   margin-top: 4px;
+}
+
+.modal-task-title {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.7;
 }
