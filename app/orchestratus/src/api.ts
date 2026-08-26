@@ -34,6 +34,17 @@ export const updateTaskStatus = (
 
 export const fetchAgents = () => request<Agent[]>('/api/agent')
 
+export const createAgent = (agent: { name: string; description: string }) =>
+  send<Agent>('/api/agent', 'POST', agent)
+
+export const updateAgent = (
+  id: string,
+  agent: { name: string; description: string },
+) => send<Agent>(`/api/agent/${id}`, 'PUT', agent)
+
+export const deleteAgent = (id: string) =>
+  request<{ message: string }>(`/api/agent/${id}`, { method: 'DELETE' })
+
 export const runTask = (
   projectId: number,
   taskId: number,
