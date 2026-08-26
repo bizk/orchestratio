@@ -114,6 +114,18 @@ type LaunchedAgentProfile struct {
 	Revision       int    `json:"revision"`
 }
 
+type Branch struct {
+	Name         string  `json:"name"`
+	CommitSHA    string  `json:"commit_sha"`
+	Protected    bool    `json:"protected"`
+	LastPushDate *string `json:"last_push_date"`
+}
+
+type BranchPage struct {
+	Items      []Branch `json:"items"`
+	NextPageID *string  `json:"next_page_id"`
+}
+
 // StartConversation creates a new OpenHands Cloud conversation (V1).
 // POST {baseURL}/v1/app-conversations
 func (s *OpenHandsService) StartConversation(ctx context.Context, req StartConversationRequest) (*StartConversationResponse, error) {
@@ -169,6 +181,32 @@ func (s *OpenHandsService) GetConversation(ctx context.Context, conversationID s
 
 		if page.NextPageID == nil || *page.NextPageID == "" {
 			return nil, fmt.Errorf("%w: %s", ErrConversationNotFound, conversationID)
+		}
+		pageID = *page.NextPageID
+	}
+}
+
+// SearchBranches lists all branches of a repository, following pagination.
+// GET {baseURL}/v1/git/branches/search
+func (s *OpenHandsService) SearchBranches(ctx context.Context, provider, repository string) ([]Branch, error) {
+	branches := []Branch{}
+	pageID := ""
+	for {
+		query := url.Values{}
+		query.Set("provider", provider)
+		query.Set("repository", repository)
+		query.Set("query", "")
+		query.Set("limit", "100")
+		setQuery(query, "page_id", pageID)
+
+		var page BranchPage
+		if err := s.doJSON(ctx, http.MethodGet, "/v1/git/branches/search", query, nil, &page); err != nil {
+			return nil, fmt.Errorf("search branches: %w", err)
+		}
+
+		branches = append(branches, page.Items...)
+		if page.NextPageID == nil || *page.NextPageID == "" {
+			return branches, nil
 		}
 		pageID = *page.NextPageID
 	}
