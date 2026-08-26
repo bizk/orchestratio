@@ -39,6 +39,8 @@ func RegisterRoutes(r *gin.Engine) {
 			agents.POST("", handlers.CreateAgent)
 			agents.GET("", handlers.ListAgents)
 			agents.GET("/:id", handlers.GetAgentByID)
+			agents.PUT("/:id", handlers.UpdateAgent)
+			agents.DELETE("/:id", handlers.DeleteAgent)
 		}
 		api.GET("/repository", handlers.ListRepositories)
 		api.GET("/repository/branches", handlers.ListBranches)
