@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
-import { createAgent, createTask, deleteAgent, fetchAgents, fetchProjects, fetchTasks, runTask, updateAgent, updateTaskStatus } from './api'
-import { STATUSES, STATUS_LABELS, type Agent, type Project, type Status, type Task } from './types'
+import { createAgent, createTask, deleteAgent, fetchAgents,fetchBranches, fetchProjects, fetchRepositories, fetchTasks, runTask, updateAgent, updateTaskStatus } from './api'
+import { STATUSES, STATUS_LABELS, type Agent, type Branch, type Project, type Repository, type Status, type Task } from './types'
 
 function groupByStatus(tasks: Task[]): Record<Status, Task[]> {
   const grouped: Record<Status, Task[]> = {
@@ -263,10 +263,12 @@ function AgentsSection({
 
 function RunTaskModal({
   task,
+  repositories,
   onSubmit,
   onClose,
 }: {
   task: Task
+  repositories: Repository[]
   onSubmit: (opts: {
     agentId: string
     repositoryName: string
@@ -277,9 +279,14 @@ function RunTaskModal({
   const [agents, setAgents] = useState<Agent[]>([])
   const [agentId, setAgentId] = useState('')
   const [repositoryName, setRepositoryName] = useState('')
+  const [branchList, setBranchList] = useState<{ repo: string; items: Branch[] } | null>(null)
   const [branchName, setBranchName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Fall back to the first preloaded repository until the user picks one.
+  const selectedRepo = repositoryName || repositories[0]?.full_name || ''
+  const branches = branchList?.repo === selectedRepo ? branchList.items : []
 
   useEffect(() => {
     fetchAgents()
@@ -290,13 +297,33 @@ function RunTaskModal({
       .catch((err: Error) => setError(err.message))
   }, [])
 
+  useEffect(() => {
+    if (!selectedRepo) return
+    let cancelled = false
+    fetchBranches(selectedRepo)
+      .then((list) => {
+        if (cancelled) return
+        setBranchList({ repo: selectedRepo, items: list })
+        const main = repositories.find((r) => r.full_name === selectedRepo)?.main_branch
+        setBranchName(
+          list.some((b) => b.name === main) ? main! : (list[0]?.name ?? ''),
+        )
+      })
+      .catch((err: Error) => {
+        if (!cancelled) setError(err.message)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedRepo, repositories])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
     setError(null)
     onSubmit({
       agentId,
-      repositoryName: repositoryName.trim(),
+      repositoryName: selectedRepo,
       branchName: branchName.trim(),
     })
       .catch((err: Error) => {
@@ -330,23 +357,31 @@ function RunTaskModal({
           </label>
           <label>
             Repository
-            <input
-              type="text"
-              placeholder="owner/repo"
-              value={repositoryName}
+            <select
+              value={selectedRepo}
               onChange={(e) => setRepositoryName(e.target.value)}
-              required
-              autoFocus
-            />
+            >
+              {repositories.length === 0 && <option value="">No repositories</option>}
+              {repositories.map((r) => (
+                <option key={r.id} value={r.full_name}>
+                  {r.full_name}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             Branch
-            <input
-              type="text"
-              placeholder="main"
+            <select
               value={branchName}
               onChange={(e) => setBranchName(e.target.value)}
-            />
+            >
+              {branches.length === 0 && <option value="">Loading branches…</option>}
+              {branches.map((b) => (
+                <option key={b.name} value={b.name}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
           </label>
           {error && <p className="board-error">{error}</p>}
           <div className="modal-actions">
@@ -356,7 +391,7 @@ function RunTaskModal({
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={submitting || !agentId || !repositoryName.trim()}
+              disabled={submitting || !agentId || !selectedRepo}
             >
               {submitting ? 'Running…' : 'Run'}
             </button>
@@ -372,6 +407,7 @@ function App() {
   const [projectId, setProjectId] = useState<number | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [agents, setAgents] = useState<Agent[]>([])
+  const [repositories, setRepositories] = useState<Repository[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null)
@@ -391,6 +427,10 @@ function App() {
 
     fetchAgents()
       .then(setAgents)
+      .catch(() => {})
+
+    fetchRepositories()
+      .then(setRepositories)
       .catch(() => {})
   }, [])
 
@@ -567,6 +607,7 @@ function App() {
       {runTaskTarget && (
         <RunTaskModal
           task={runTaskTarget}
+          repositories={repositories}
           onSubmit={handleRunTask}
           onClose={() => setRunTaskId(null)}
         />

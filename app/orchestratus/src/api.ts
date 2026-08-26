@@ -1,4 +1,4 @@
-import type { Agent, Project, Status, Task } from './types'
+import type { Agent, Branch, Project, Repository, Status, Task } from './types'
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init)
@@ -32,7 +32,12 @@ export const updateTaskStatus = (
   status: Status,
 ) => send<Task>(`/api/project/${projectId}/task/${taskId}`, 'PUT', { Status: status })
 
-export const fetchAgents = () => request<Agent[]>('/api/agent')
+export const fetchRepositories = () => request<Repository[]>('/api/repository')
+
+export const fetchBranches = (repositoryName: string) =>
+  request<Branch[]>(
+    `/api/repository/branches?${new URLSearchParams({ repositoryName })}`,
+  )
 
 export const createAgent = (agent: { name: string; description: string }) =>
   send<Agent>('/api/agent', 'POST', agent)
@@ -51,12 +56,9 @@ export const runTask = (
   agentId: string,
   repositoryName: string,
   branchName?: string,
-) => {
-  const params = new URLSearchParams({ repositoryName })
-  if (branchName) params.set('branchName', branchName)
-  return send<unknown>(
-    `/api/project/${projectId}/task/${taskId}/run?${params}`,
-    'POST',
-    { agentId },
-  )
-}
+) =>
+  send<unknown>(`/api/project/${projectId}/task/${taskId}/run`, 'POST', {
+    agentId,
+    repositoryName,
+    branchName,
+  })

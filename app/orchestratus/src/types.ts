@@ -35,3 +35,21 @@ export interface Agent {
   created_at: string
   updated_at: string
 }
+
+export interface Repository {
+  id: string
+  full_name: string
+  git_provider: string
+  is_public: boolean
+  stargazers_count: number
+  pushed_at: string | null
+  owner_type: string
+  main_branch: string
+}
+
+export interface Branch {
+  name: string
+  commit_sha: string
+  protected: boolean
+  last_push_date: string | null
+}
