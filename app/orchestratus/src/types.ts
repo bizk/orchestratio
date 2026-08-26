@@ -28,9 +28,10 @@ export interface Task {
   DateCreated: string
 }
 
-// Mirrors the Go Agent model, which serializes with json tags.
 export interface Agent {
   id: string
   name: string
   description: string
+  created_at: string
+  updated_at: string
 }

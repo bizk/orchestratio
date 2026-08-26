@@ -140,6 +140,26 @@ function NewTaskModal({
   )
 }
 
+function AgentsSection({ agents }: { agents: Agent[] }) {
+  return (
+    <section className="agents-section" aria-label="Available agents">
+      <h2>Available Agents</h2>
+      {agents.length === 0 ? (
+        <p className="agents-empty">No agents available</p>
+      ) : (
+        <div className="agents-grid">
+          {agents.map((agent) => (
+            <article key={agent.id} className="agent-card">
+              <h3>{agent.name}</h3>
+              <p>{agent.description}</p>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 function RunTaskModal({
   task,
   onSubmit,
@@ -250,6 +270,7 @@ function App() {
   const [projects, setProjects] = useState<Project[]>([])
   const [projectId, setProjectId] = useState<number | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
+  const [agents, setAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null)
@@ -265,6 +286,10 @@ function App() {
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false))
+
+    fetchAgents()
+      .then(setAgents)
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -361,6 +386,8 @@ function App() {
       </header>
 
       {error && <p className="board-error">{error}</p>}
+
+      <AgentsSection agents={agents} />
 
       <div className="board-columns">
         {STATUSES.map((status) => (
