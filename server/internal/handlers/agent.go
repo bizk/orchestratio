@@ -123,7 +123,7 @@ func DeleteAgent(c *gin.Context) {
 		return
 	}
 
-	result := db.Delete(&models.Agent{}, id)
+	result := db.Where("id = ?", id).Delete(&models.Agent{})
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 		return

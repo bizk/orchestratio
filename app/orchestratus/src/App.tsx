@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
-import { createTask, fetchAgents, fetchBranches, fetchProjects, fetchRepositories, fetchTasks, runTask, updateTaskStatus } from './api'
+import { createAgent, createTask, deleteAgent, fetchAgents,fetchBranches, fetchProjects, fetchRepositories, fetchTasks, runTask, updateAgent, updateTaskStatus } from './api'
 import { STATUSES, STATUS_LABELS, type Agent, type Branch, type Project, type Repository, type Status, type Task } from './types'
 
 function groupByStatus(tasks: Task[]): Record<Status, Task[]> {
@@ -140,10 +140,99 @@ function NewTaskModal({
   )
 }
 
-function AgentsSection({ agents }: { agents: Agent[] }) {
+function AgentModal({
+  agent,
+  onSubmit,
+  onClose,
+}: {
+  agent: Agent | null
+  onSubmit: (agent: { name: string; description: string }) => Promise<void>
+  onClose: () => void
+}) {
+  const [name, setName] = useState(agent?.name ?? '')
+  const [description, setDescription] = useState(agent?.description ?? '')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setSubmitting(true)
+    setError(null)
+    onSubmit({ name: name.trim(), description: description.trim() })
+      .catch((err: Error) => {
+        setError(err.message)
+        setSubmitting(false)
+      })
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={agent ? 'Edit agent' : 'New agent'}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2>{agent ? 'Edit Agent' : 'New Agent'}</h2>
+        <form onSubmit={handleSubmit}>
+          <label>
+            Name
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              autoFocus
+            />
+          </label>
+          <label>
+            Description
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={4}
+              required
+            />
+          </label>
+          {error && <p className="board-error">{error}</p>}
+          <div className="modal-actions">
+            <button type="button" className="btn" onClick={onClose} disabled={submitting}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={submitting || !name.trim() || !description.trim()}
+            >
+              {submitting ? 'Saving…' : agent ? 'Save Changes' : 'Create Agent'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function AgentsSection({
+  agents,
+  onNew,
+  onEdit,
+  onDelete,
+}: {
+  agents: Agent[]
+  onNew: () => void
+  onEdit: (agent: Agent) => void
+  onDelete: (agent: Agent) => void
+}) {
   return (
     <section className="agents-section" aria-label="Available agents">
-      <h2>Available Agents</h2>
+      <div className="agents-header">
+        <h2>Available Agents</h2>
+        <button type="button" className="btn btn-primary" onClick={onNew}>
+          + New Agent
+        </button>
+      </div>
       {agents.length === 0 ? (
         <p className="agents-empty">No agents available</p>
       ) : (
@@ -152,6 +241,18 @@ function AgentsSection({ agents }: { agents: Agent[] }) {
             <article key={agent.id} className="agent-card">
               <h3>{agent.name}</h3>
               <p>{agent.description}</p>
+              <footer>
+                <button type="button" className="btn" onClick={() => onEdit(agent)}>
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={() => onDelete(agent)}
+                >
+                  Delete
+                </button>
+              </footer>
             </article>
           ))}
         </div>
@@ -313,6 +414,7 @@ function App() {
   const [dropTarget, setDropTarget] = useState<Status | null>(null)
   const [showNewTask, setShowNewTask] = useState(false)
   const [runTaskId, setRunTaskId] = useState<number | null>(null)
+  const [agentModal, setAgentModal] = useState<'new' | Agent | null>(null)
 
   useEffect(() => {
     fetchProjects()
@@ -388,6 +490,28 @@ function App() {
     )
     setRunTaskId(null)
   }
+  const handleSaveAgent = async (draft: { name: string; description: string }) => {
+    if (agentModal === null) return
+    const saved =
+      agentModal === 'new'
+        ? await createAgent(draft)
+        : await updateAgent(agentModal.id, draft)
+    setAgents((prev) =>
+      agentModal === 'new'
+        ? [...prev, saved]
+        : prev.map((a) => (a.id === saved.id ? saved : a)),
+    )
+    setAgentModal(null)
+  }
+
+  const handleDeleteAgent = (agent: Agent) => {
+    if (!window.confirm(`Delete agent "${agent.name}"?`)) return
+    setError(null)
+    deleteAgent(agent.id)
+      .then(() => setAgents((prev) => prev.filter((a) => a.id !== agent.id)))
+      .catch((err: Error) => setError(err.message))
+  }
+
   const runTaskTarget = tasks.find((t) => t.ID === runTaskId)
 
   if (loading) return <p className="board-notice">Loading projects…</p>
@@ -427,7 +551,12 @@ function App() {
 
       {error && <p className="board-error">{error}</p>}
 
-      <AgentsSection agents={agents} />
+      <AgentsSection
+        agents={agents}
+        onNew={() => setAgentModal('new')}
+        onEdit={setAgentModal}
+        onDelete={handleDeleteAgent}
+      />
 
       <div className="board-columns">
         {STATUSES.map((status) => (
@@ -481,6 +610,15 @@ function App() {
           repositories={repositories}
           onSubmit={handleRunTask}
           onClose={() => setRunTaskId(null)}
+        />
+      )}
+
+      {agentModal !== null && (
+        <AgentModal
+          key={agentModal === 'new' ? 'new' : agentModal.id}
+          agent={agentModal === 'new' ? null : agentModal}
+          onSubmit={handleSaveAgent}
+          onClose={() => setAgentModal(null)}
         />
       )}
     </main>
