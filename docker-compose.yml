@@ -26,6 +26,8 @@ services:
     environment:
       PORT: 8080
       DATABASE_URL: postgres://${POSTGRES_USER:-orchestratio}:${POSTGRES_PASSWORD:-orchestratio}@db:5432/${POSTGRES_DB:-orchestratio}?sslmode=disable
+      OPEN_HANDS_API_KEY: ${OPEN_HANDS_API_KEY:-}
+      OPEN_HANDS_BASE_URL: ${OPEN_HANDS_BASE_URL:-}
     ports:
       - "${SERVER_PORT:-8080}:8080"
     depends_on:
