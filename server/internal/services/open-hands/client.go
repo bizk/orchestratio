@@ -126,6 +126,23 @@ type BranchPage struct {
 	NextPageID *string  `json:"next_page_id"`
 }
 
+type Repository struct {
+	ID              string  `json:"id"`
+	FullName        string  `json:"full_name"`
+	GitProvider     string  `json:"git_provider"`
+	IsPublic        bool    `json:"is_public"`
+	StargazersCount int     `json:"stargazers_count"`
+	LinkHeader      *string `json:"link_header"`
+	PushedAt        *string `json:"pushed_at"`
+	OwnerType       string  `json:"owner_type"`
+	MainBranch      string  `json:"main_branch"`
+}
+
+type RepositoryPage struct {
+	Items      []Repository `json:"items"`
+	NextPageID *string      `json:"next_page_id"`
+}
+
 // StartConversation creates a new OpenHands Cloud conversation (V1).
 // POST {baseURL}/v1/app-conversations
 func (s *OpenHandsService) StartConversation(ctx context.Context, req StartConversationRequest) (*StartConversationResponse, error) {
@@ -207,6 +224,31 @@ func (s *OpenHandsService) SearchBranches(ctx context.Context, provider, reposit
 		branches = append(branches, page.Items...)
 		if page.NextPageID == nil || *page.NextPageID == "" {
 			return branches, nil
+		}
+		pageID = *page.NextPageID
+	}
+}
+
+// SearchRepositories lists all repositories visible to the user, following pagination.
+// GET {baseURL}/v1/git/repositories/search
+func (s *OpenHandsService) SearchRepositories(ctx context.Context, provider, searchQuery string) ([]Repository, error) {
+	repositories := []Repository{}
+	pageID := ""
+	for {
+		query := url.Values{}
+		query.Set("provider", provider)
+		query.Set("limit", "100")
+		setQuery(query, "query", searchQuery)
+		setQuery(query, "page_id", pageID)
+
+		var page RepositoryPage
+		if err := s.doJSON(ctx, http.MethodGet, "/v1/git/repositories/search", query, nil, &page); err != nil {
+			return nil, fmt.Errorf("search repositories: %w", err)
+		}
+
+		repositories = append(repositories, page.Items...)
+		if page.NextPageID == nil || *page.NextPageID == "" {
+			return repositories, nil
 		}
 		pageID = *page.NextPageID
 	}
