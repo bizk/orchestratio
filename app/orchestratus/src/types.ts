@@ -27,3 +27,10 @@ export interface Task {
   Approved: boolean
   DateCreated: string
 }
+
+// Mirrors the Go Agent model, which serializes with json tags.
+export interface Agent {
+  id: string
+  name: string
+  description: string
+}

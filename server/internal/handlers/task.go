@@ -183,5 +183,11 @@ func RunTask(c *gin.Context) {
 		return
 	}
 
+	if err := db.Model(&task).Update("status", models.StatusInProgress).Error; err != nil {
+		fmt.Printf("failed to update task status: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, agentResponse)
 }

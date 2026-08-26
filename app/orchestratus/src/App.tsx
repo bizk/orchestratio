@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
-import { createTask, fetchProjects, fetchTasks, updateTaskStatus } from './api'
-import { STATUSES, STATUS_LABELS, type Project, type Status, type Task } from './types'
+import { createTask, fetchAgents, fetchProjects, fetchTasks, runTask, updateTaskStatus } from './api'
+import { STATUSES, STATUS_LABELS, type Agent, type Project, type Status, type Task } from './types'
 
 function groupByStatus(tasks: Task[]): Record<Status, Task[]> {
   const grouped: Record<Status, Task[]> = {
@@ -19,9 +19,11 @@ function groupByStatus(tasks: Task[]): Record<Status, Task[]> {
 function TaskCard({
   task,
   onDragStart,
+  onRun,
 }: {
   task: Task
   onDragStart: (taskId: number) => void
+  onRun: (taskId: number) => void
 }) {
   return (
     <article
@@ -39,10 +41,19 @@ function TaskCard({
       </header>
       {task.Description && <p>{task.Description}</p>}
       <footer>
-        <span className="task-id">#{task.ID}</span>
-        <time dateTime={task.DateCreated}>
-          {new Date(task.DateCreated).toLocaleDateString()}
-        </time>
+        <div className="task-meta">
+          <span className="task-id">#{task.ID}</span>
+          <time dateTime={task.DateCreated}>
+            {new Date(task.DateCreated).toLocaleDateString()}
+          </time>
+        </div>
+        <button
+          type="button"
+          className="btn btn-run"
+          onClick={() => onRun(task.ID)}
+        >
+          Run
+        </button>
       </footer>
     </article>
   )
@@ -129,6 +140,112 @@ function NewTaskModal({
   )
 }
 
+function RunTaskModal({
+  task,
+  onSubmit,
+  onClose,
+}: {
+  task: Task
+  onSubmit: (opts: {
+    agentId: string
+    repositoryName: string
+    branchName: string
+  }) => Promise<void>
+  onClose: () => void
+}) {
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [agentId, setAgentId] = useState('')
+  const [repositoryName, setRepositoryName] = useState('')
+  const [branchName, setBranchName] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchAgents()
+      .then((list) => {
+        setAgents(list)
+        if (list.length > 0) setAgentId(list[0].id)
+      })
+      .catch((err: Error) => setError(err.message))
+  }, [])
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setSubmitting(true)
+    setError(null)
+    onSubmit({
+      agentId,
+      repositoryName: repositoryName.trim(),
+      branchName: branchName.trim(),
+    })
+      .catch((err: Error) => {
+        setError(err.message)
+        setSubmitting(false)
+      })
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Run task"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2>Run Task</h2>
+        <form onSubmit={handleSubmit}>
+          <p className="modal-task-title">{task.Title}</p>
+          <label>
+            Agent
+            <select value={agentId} onChange={(e) => setAgentId(e.target.value)}>
+              {agents.length === 0 && <option value="">No agents</option>}
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Repository
+            <input
+              type="text"
+              placeholder="owner/repo"
+              value={repositoryName}
+              onChange={(e) => setRepositoryName(e.target.value)}
+              required
+              autoFocus
+            />
+          </label>
+          <label>
+            Branch
+            <input
+              type="text"
+              placeholder="main"
+              value={branchName}
+              onChange={(e) => setBranchName(e.target.value)}
+            />
+          </label>
+          {error && <p className="board-error">{error}</p>}
+          <div className="modal-actions">
+            <button type="button" className="btn" onClick={onClose} disabled={submitting}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={submitting || !agentId || !repositoryName.trim()}
+            >
+              {submitting ? 'Running…' : 'Run'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const [projects, setProjects] = useState<Project[]>([])
   const [projectId, setProjectId] = useState<number | null>(null)
@@ -138,6 +255,7 @@ function App() {
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null)
   const [dropTarget, setDropTarget] = useState<Status | null>(null)
   const [showNewTask, setShowNewTask] = useState(false)
+  const [runTaskId, setRunTaskId] = useState<number | null>(null)
 
   useEffect(() => {
     fetchProjects()
@@ -190,6 +308,22 @@ function App() {
     setTasks((prev) => [created, ...prev])
     setShowNewTask(false)
   }
+
+  const handleRunTask = async (opts: {
+    agentId: string
+    repositoryName: string
+    branchName: string
+  }) => {
+    if (projectId === null || runTaskId === null) return
+    const taskId = runTaskId
+    await runTask(projectId, taskId, opts.agentId, opts.repositoryName, opts.branchName)
+    // The server sets the task to in_progress; mirror it optimistically.
+    setTasks((prev) =>
+      prev.map((t) => (t.ID === taskId ? { ...t, Status: 'in_progress' as Status } : t)),
+    )
+    setRunTaskId(null)
+  }
+  const runTaskTarget = tasks.find((t) => t.ID === runTaskId)
 
   if (loading) return <p className="board-notice">Loading projects…</p>
 
@@ -256,6 +390,7 @@ function App() {
                   key={task.ID}
                   task={task}
                   onDragStart={setDraggedTaskId}
+                  onRun={setRunTaskId}
                 />
               ))}
               {columns[status].length === 0 && (
@@ -270,6 +405,14 @@ function App() {
         <NewTaskModal
           onSubmit={handleCreateTask}
           onClose={() => setShowNewTask(false)}
+        />
+      )}
+
+      {runTaskTarget && (
+        <RunTaskModal
+          task={runTaskTarget}
+          onSubmit={handleRunTask}
+          onClose={() => setRunTaskId(null)}
         />
       )}
     </main>
