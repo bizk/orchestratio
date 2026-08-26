@@ -27,3 +27,11 @@ export interface Task {
   Approved: boolean
   DateCreated: string
 }
+
+export interface Agent {
+  id: string
+  name: string
+  description: string
+  created_at: string
+  updated_at: string
+}

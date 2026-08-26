@@ -1,4 +1,4 @@
-import type { Project, Status, Task } from './types'
+import type { Agent, Project, Status, Task } from './types'
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init)
@@ -17,6 +17,8 @@ function send<T>(url: string, method: string, body: unknown): Promise<T> {
 }
 
 export const fetchProjects = () => request<Project[]>('/api/project')
+
+export const fetchAgents = () => request<Agent[]>('/api/agent')
 
 export const fetchTasks = (projectId: number) =>
   request<Task[]>(`/api/project/${projectId}/task`)
