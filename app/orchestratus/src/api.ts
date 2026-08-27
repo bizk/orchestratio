@@ -25,6 +25,10 @@ export const fetchTaskPullRequests = (projectId: number, taskId: number) =>
   request<{ pullRequests: PullRequest[] }>(`/api/project/${projectId}/task/${taskId}/pull-requests`)
     .then((response) => response.pullRequests)
 
+export const fetchTaskAgentResponse = (projectId: number, taskId: number) =>
+  request<{ response: string | null }>(`/api/project/${projectId}/task/${taskId}/agent-response`)
+    .then((response) => response.response)
+
 export const createTask = (
   projectId: number,
   task: { Title: string; Description: string; Status: Status },

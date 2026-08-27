@@ -143,6 +143,23 @@ type RepositoryPage struct {
 	NextPageID *string      `json:"next_page_id"`
 }
 
+type EventPage struct {
+	Items      []ConversationEvent `json:"items"`
+	NextPageID *string             `json:"next_page_id"`
+}
+
+type ConversationEvent struct {
+	Kind       string        `json:"kind"`
+	ID         string        `json:"id"`
+	Timestamp  string        `json:"timestamp"`
+	Source     string        `json:"source"`
+	LLMMessage *EventMessage `json:"llm_message"`
+}
+
+type EventMessage struct {
+	Content []TextContent `json:"content"`
+}
+
 // StartConversation creates a new OpenHands Cloud conversation (V1).
 // POST {baseURL}/v1/app-conversations
 func (s *OpenHandsService) StartConversation(ctx context.Context, req StartConversationRequest) (*StartConversationResponse, error) {
@@ -191,6 +208,70 @@ func (s *OpenHandsService) SearchConversations(ctx context.Context, params Searc
 		return nil, fmt.Errorf("search conversations: %w", err)
 	}
 	return &out, nil
+}
+
+type SearchEventsParams struct {
+	Kind      string
+	SortOrder string
+	PageID    string
+	Limit     int
+}
+
+func (s *OpenHandsService) SearchEvents(ctx context.Context, conversationID string, params SearchEventsParams) (*EventPage, error) {
+	query := url.Values{}
+	setQuery(query, "kind__eq", params.Kind)
+	setQuery(query, "sort_order", params.SortOrder)
+	setQuery(query, "page_id", params.PageID)
+	if params.Limit > 0 {
+		query.Set("limit", strconv.Itoa(params.Limit))
+	}
+
+	var out EventPage
+	path := fmt.Sprintf("/v1/conversation/%s/events/search", url.PathEscape(conversationID))
+	if err := s.doJSON(ctx, http.MethodGet, path, query, nil, &out); err != nil {
+		return nil, fmt.Errorf("search conversation events: %w", err)
+	}
+	return &out, nil
+}
+
+func (s *OpenHandsService) GetLatestAgentResponse(ctx context.Context, conversationID string) (*string, error) {
+	pageID := ""
+	for {
+		page, err := s.SearchEvents(ctx, conversationID, SearchEventsParams{
+			Kind:      "MessageEvent",
+			SortOrder: "TIMESTAMP_DESC",
+			PageID:    pageID,
+			Limit:     100,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		for _, event := range page.Items {
+			if event.Kind != "MessageEvent" || event.Source != "agent" || event.LLMMessage == nil {
+				continue
+			}
+			text := eventMessageText(event.LLMMessage)
+			if strings.TrimSpace(text) != "" {
+				return &text, nil
+			}
+		}
+
+		if page.NextPageID == nil || *page.NextPageID == "" {
+			return nil, nil
+		}
+		pageID = *page.NextPageID
+	}
+}
+
+func eventMessageText(message *EventMessage) string {
+	parts := make([]string, 0, len(message.Content))
+	for _, content := range message.Content {
+		if content.Type == "text" && content.Text != "" {
+			parts = append(parts, content.Text)
+		}
+	}
+	return strings.Join(parts, "\n")
 }
 
 // GetConversation finds a conversation by ID via the search endpoint.

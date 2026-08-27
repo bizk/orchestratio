@@ -138,6 +138,25 @@
   font-style: italic;
 }
 
+.latest-agent-response {
+  max-height: 9.5em;
+  margin-top: 16px;
+  padding: 11px 12px;
+  overflow: auto;
+  background: rgb(16 17 19 / 36%);
+  border: 1px solid #343945;
+  border-radius: 9px;
+}
+
+.latest-agent-response-ready {
+  background: rgb(76 110 245 / 10%);
+  border-color: rgb(76 110 245 / 34%);
+}
+
+.latest-agent-response-text {
+  white-space: pre-wrap;
+}
+
 .pull-request-panel {
   margin-top: 16px;
   padding: 11px 12px;

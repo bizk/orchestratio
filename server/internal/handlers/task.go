@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -92,27 +93,16 @@ func GetTaskPullRequests(c *gin.Context) {
 		return
 	}
 
-	conversationID := task.OpenHandsConversationID
 	openHandsService := c.MustGet("openHandsService").(*openhands.OpenHandsService)
-	if conversationID == nil && task.OpenHandsStartTaskID != nil {
-		startTask, err := openHandsService.GetStartTask(c.Request.Context(), *task.OpenHandsStartTaskID)
-		if err != nil {
-			if errors.Is(err, openhands.ErrConversationNotFound) {
-				c.JSON(http.StatusOK, gin.H{"pullRequests": []pullRequest{}})
-				return
-			}
-			fmt.Printf("failed to get OpenHands start task: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	conversationID, err := resolveTaskConversationID(db, &task, openHandsService, c.Request.Context())
+	if err != nil {
+		if errors.Is(err, openhands.ErrConversationNotFound) {
+			c.JSON(http.StatusOK, gin.H{"pullRequests": []pullRequest{}})
 			return
 		}
-		conversationID = startTask.AppConversationID
-		if conversationID != nil {
-			if err := db.Model(&task).Update("open_hands_conversation_id", *conversationID).Error; err != nil {
-				fmt.Printf("failed to store OpenHands conversation ID: %v", err)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-		}
+		fmt.Printf("failed to resolve OpenHands conversation: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
 	if conversationID == nil {
@@ -136,6 +126,77 @@ func GetTaskPullRequests(c *gin.Context) {
 		pullRequests = append(pullRequests, pullRequest{Number: number, URL: githubPullRequestURL(conversation.SelectedRepository, number)})
 	}
 	c.JSON(http.StatusOK, gin.H{"pullRequests": pullRequests})
+}
+
+func GetTaskAgentResponse(c *gin.Context) {
+	db := c.MustGet("db").(*gorm.DB)
+	projectID := c.Param("id")
+	taskID := c.Param("taskId")
+	if projectID == "" || taskID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "project ID and task ID are required"})
+		return
+	}
+
+	var task models.Task
+	if err := db.Where("id = ? AND project_id = ?", taskID, projectID).First(&task).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+			return
+		}
+		fmt.Printf("failed to get task: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	openHandsService := c.MustGet("openHandsService").(*openhands.OpenHandsService)
+	conversationID, err := resolveTaskConversationID(db, &task, openHandsService, c.Request.Context())
+	if err != nil {
+		if errors.Is(err, openhands.ErrConversationNotFound) {
+			c.JSON(http.StatusOK, gin.H{"response": nil})
+			return
+		}
+		fmt.Printf("failed to resolve OpenHands conversation: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if conversationID == nil {
+		c.JSON(http.StatusOK, gin.H{"response": nil})
+		return
+	}
+
+	response, err := openHandsService.GetLatestAgentResponse(c.Request.Context(), *conversationID)
+	if err != nil {
+		if errors.Is(err, openhands.ErrConversationNotFound) {
+			c.JSON(http.StatusOK, gin.H{"response": nil})
+			return
+		}
+		fmt.Printf("failed to get latest OpenHands response: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"response": response})
+}
+
+func resolveTaskConversationID(db *gorm.DB, task *models.Task, service *openhands.OpenHandsService, ctx context.Context) (*string, error) {
+	if task.OpenHandsConversationID != nil {
+		return task.OpenHandsConversationID, nil
+	}
+	if task.OpenHandsStartTaskID == nil {
+		return nil, nil
+	}
+
+	startTask, err := service.GetStartTask(ctx, *task.OpenHandsStartTaskID)
+	if err != nil {
+		return nil, err
+	}
+	if startTask.AppConversationID == nil {
+		return nil, nil
+	}
+	if err := db.Model(task).Update("open_hands_conversation_id", *startTask.AppConversationID).Error; err != nil {
+		return nil, fmt.Errorf("store OpenHands conversation ID: %w", err)
+	}
+	task.OpenHandsConversationID = startTask.AppConversationID
+	return task.OpenHandsConversationID, nil
 }
 
 func githubPullRequestURL(repository *string, number int) string {

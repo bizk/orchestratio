@@ -139,6 +139,81 @@ func TestGetStartTaskReturnsNotFoundForEmptyResponse(t *testing.T) {
 	}
 }
 
+func TestGetLatestAgentResponse(t *testing.T) {
+	nextPage := "next"
+	var requestedPages []string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/conversation/conversation-1/events/search" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Header.Get("X-Access-Token") != "test-key" {
+			t.Errorf("missing X-Access-Token header")
+		}
+		query := r.URL.Query()
+		if query.Get("kind__eq") != "MessageEvent" || query.Get("sort_order") != "TIMESTAMP_DESC" || query.Get("limit") != "100" {
+			t.Errorf("unexpected query params: %s", r.URL.RawQuery)
+		}
+		requestedPages = append(requestedPages, query.Get("page_id"))
+
+		if query.Get("page_id") == "" {
+			_ = json.NewEncoder(w).Encode(EventPage{
+				Items: []ConversationEvent{{
+					Kind:   "MessageEvent",
+					Source: "user",
+					LLMMessage: &EventMessage{Content: []TextContent{{
+						Type: "text",
+						Text: "Please fix this",
+					}}},
+				}},
+				NextPageID: &nextPage,
+			})
+			return
+		}
+
+		_ = json.NewEncoder(w).Encode(EventPage{Items: []ConversationEvent{
+			{Kind: "MessageEvent", Source: "agent", LLMMessage: &EventMessage{Content: []TextContent{
+				{Type: "image", Text: "ignored"},
+				{Type: "text", Text: "Implemented "},
+				{Type: "text", Text: "the fix."},
+			}}},
+		}})
+	}))
+	defer server.Close()
+
+	svc := NewOpenHandsService("test-key", server.URL)
+	response, err := svc.GetLatestAgentResponse(context.Background(), "conversation-1")
+	if err != nil {
+		t.Fatalf("GetLatestAgentResponse: %v", err)
+	}
+	if response == nil || *response != "Implemented \nthe fix." {
+		t.Fatalf("unexpected response: %v", response)
+	}
+	if len(requestedPages) != 2 || requestedPages[0] != "" || requestedPages[1] != nextPage {
+		t.Fatalf("unexpected pagination requests: %v", requestedPages)
+	}
+}
+
+func TestGetLatestAgentResponseReturnsNilWhenNoAgentMessage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(EventPage{Items: []ConversationEvent{{
+			Kind:       "MessageEvent",
+			Source:     "user",
+			LLMMessage: &EventMessage{Content: []TextContent{{Type: "text", Text: "request"}}},
+		}}})
+	}))
+	defer server.Close()
+
+	svc := NewOpenHandsService("test-key", server.URL)
+	response, err := svc.GetLatestAgentResponse(context.Background(), "conversation-1")
+	if err != nil {
+		t.Fatalf("GetLatestAgentResponse: %v", err)
+	}
+	if response != nil {
+		t.Fatalf("expected no response, got %q", *response)
+	}
+}
+
 func stringPointer(value string) *string {
 	return &value
 }
