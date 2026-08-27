@@ -39,6 +39,8 @@ export const fetchBranches = (repositoryName: string) =>
     `/api/repository/branches?${new URLSearchParams({ repositoryName })}`,
   )
 
+export const fetchAgents = () => request<Agent[]>('/api/agent')
+
 export const createAgent = (agent: { name: string; description: string }) =>
   send<Agent>('/api/agent', 'POST', agent)
 
