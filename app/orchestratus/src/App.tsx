@@ -44,6 +44,8 @@ const modalClassNames = {
   close: 'app-modal-close',
 }
 
+const MAX_TICKETS_PER_COLUMN = 10
+
 function groupByStatus(tasks: Task[]): Record<Status, Task[]> {
   const grouped: Record<Status, Task[]> = {
     backlog: [],
@@ -330,6 +332,7 @@ function BoardColumn({
   pullRequestsByTask: Record<number, PullRequest[]>
 }) {
   const { ref, isDropTarget } = useDroppable({ id: `status-${status}` })
+  const visibleTasks = tasks.slice(0, MAX_TICKETS_PER_COLUMN)
 
   return (
     <section ref={ref} className={`column${isDropTarget ? ' column-drop-target' : ''}`}>
@@ -338,7 +341,7 @@ function BoardColumn({
         <Badge variant="light">{tasks.length}</Badge>
       </Group>
       <Stack gap="sm">
-        {tasks.map((task) => (
+        {visibleTasks.map((task) => (
           <TaskCard
             key={task.ID}
             task={task}
@@ -347,6 +350,11 @@ function BoardColumn({
             pullRequests={pullRequestsByTask[task.ID]}
           />
         ))}
+        {tasks.length > visibleTasks.length && (
+          <Text size="xs" c="dimmed" ta="center">
+            Showing {visibleTasks.length} of {tasks.length} tickets
+          </Text>
+        )}
         {tasks.length === 0 && <Text className="column-empty" size="sm" c="dimmed">No tickets</Text>}
       </Stack>
     </section>
