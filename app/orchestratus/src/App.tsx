@@ -21,7 +21,7 @@ import {
 import { DragDropProvider, DragOverlay, useDraggable, useDroppable } from '@dnd-kit/react'
 import { toast } from 'sonner'
 import './App.css'
-import { STATUSES, STATUS_LABELS, type Agent, type Project, type PullRequest, type Repository, type Status, type Task } from './types'
+import { STATUSES, STATUS_LABELS, type Agent, type Project, type Repository, type Status, type Task } from './types'
 import {
   useAgents,
   useBranches,
@@ -59,23 +59,30 @@ function groupByStatus(tasks: Task[]): Record<Status, Task[]> {
   return grouped
 }
 
+const statusBadgeColors: Record<Status, string> = {
+  backlog: 'gray',
+  in_progress: 'blue',
+  blocked: 'red',
+  completed: 'green',
+}
+
 function TaskCard({
   task,
+  projectId,
   onRun,
-  onCheckPullRequests,
-  pullRequests,
   isOverlay = false,
 }: {
   task: Task
+  projectId: number | null
   onRun: (taskId: number) => void
-  onCheckPullRequests: (taskId: number) => void
-  pullRequests?: PullRequest[]
   isOverlay?: boolean
 }) {
   const { ref, isDragging } = useDraggable({
     id: `task-${task.ID}`,
     disabled: isOverlay,
   })
+  const pullRequestQuery = useTaskPullRequests(projectId, task.ID, task.Status)
+  const pullRequests = pullRequestQuery.data ?? []
 
   return (
     <Card
@@ -86,33 +93,61 @@ function TaskCard({
       withBorder
     >
       <Group justify="space-between" align="flex-start" gap="xs" wrap="nowrap">
-        <Text className="task-card-title" fw={600} c="gray.0">{task.Title}</Text>
-        {task.Approved && <Badge color="green" variant="light">Approved</Badge>}
+        <Stack className="task-card-heading" gap={4}>
+          <Text className="task-card-kicker" size="xs" tt="uppercase">Ticket #{task.ID}</Text>
+          <Text className="task-card-title" fw={650} c="gray.0">{task.Title}</Text>
+        </Stack>
+        <Stack align="flex-end" gap={5}>
+          <Badge color={statusBadgeColors[task.Status]} variant="light">{STATUS_LABELS[task.Status]}</Badge>
+          {task.Approved && <Badge color="green" variant="outline">Approved</Badge>}
+        </Stack>
       </Group>
-      {task.Description && <Text className="task-card-description" size="sm" c="gray.5" mt={8}>{task.Description}</Text>}
-      <Group className="task-card-footer" justify="space-between" mt="md" pt="sm">
-        <Text size="xs" c="dimmed">#{task.ID} · {new Date(task.DateCreated).toLocaleDateString()}</Text>
-        <Group gap="xs">
-          {pullRequests?.map((pullRequest) => (
-            <Anchor key={pullRequest.number} href={pullRequest.url} target="_blank" rel="noreferrer" size="sm">
-              PR #{pullRequest.number}
-            </Anchor>
-          ))}
-          <Button radius="m" variant="subtle" size="compact-sm" onClick={() => onCheckPullRequests(task.ID)}>
-            Pull requests
+      {task.Description ? (
+        <Text className="task-card-description" size="sm" c="gray.5" mt="md" title={task.Description}>
+          {task.Description}
+        </Text>
+      ) : (
+        <Text className="task-card-description task-card-description-empty" size="sm" c="dimmed" mt="md">
+          No description provided.
+        </Text>
+      )}
+      {task.Status === 'in_progress' && (
+        <div className={`pull-request-panel${pullRequests.length > 0 ? ' pull-request-panel-ready' : ''}`}>
+          {pullRequests.length > 0 ? (
+            <>
+              <Text className="pull-request-label" size="xs" tt="uppercase">Pull request ready</Text>
+              <Stack gap={4} mt={5}>
+                {pullRequests.map((pullRequest) => (
+                  <Anchor key={pullRequest.number} className="pull-request-link" href={pullRequest.url} target="_blank" rel="noreferrer" size="sm">
+                    Open PR #{pullRequest.number} <span aria-hidden="true">↗</span>
+                  </Anchor>
+                ))}
+              </Stack>
+            </>
+          ) : (
+            <Group gap="xs" wrap="nowrap">
+              <span className="pull-request-pulse" aria-hidden="true" />
+              <Stack gap={1}>
+                <Text size="sm" c="gray.3">Waiting for a pull request</Text>
+                <Text size="xs" c="dimmed">We’ll check again in a minute.</Text>
+              </Stack>
+            </Group>
+          )}
+        </div>
+      )}
+      <Group className="task-card-footer" justify="space-between" align="center" mt="md" pt="sm" gap="sm" wrap="nowrap">
+        <Text className="task-card-meta" size="xs" c="dimmed">Created {new Date(task.DateCreated).toLocaleDateString()}</Text>
+        <Tooltip label="Choose an agent and repository to run this task" withArrow>
+          <Button
+            className="run-task-button"
+            radius="m"
+            variant="default"
+            aria-label={`Run task: ${task.Title}`}
+            onClick={() => onRun(task.ID)}
+          >
+            Run task
           </Button>
-          <Tooltip label="Choose an agent and repository to run this task" withArrow>
-            <Button
-              className="run-task-button"
-              radius="m"
-              variant="default"
-              aria-label={`Run task: ${task.Title}`}
-              onClick={() => onRun(task.ID)}
-            >
-              Run task
-            </Button>
-          </Tooltip>
-        </Group>
+        </Tooltip>
       </Group>
     </Card>
   )
@@ -321,15 +356,13 @@ function RunTaskModal({
 function BoardColumn({
   status,
   tasks,
+  projectId,
   onRun,
-  onCheckPullRequests,
-  pullRequestsByTask,
 }: {
   status: Status
   tasks: Task[]
+  projectId: number | null
   onRun: (taskId: number) => void
-  onCheckPullRequests: (taskId: number) => void
-  pullRequestsByTask: Record<number, PullRequest[]>
 }) {
   const { ref, isDropTarget } = useDroppable({ id: `status-${status}` })
   const visibleTasks = tasks.slice(0, MAX_TICKETS_PER_COLUMN)
@@ -345,9 +378,8 @@ function BoardColumn({
           <TaskCard
             key={task.ID}
             task={task}
+            projectId={projectId}
             onRun={onRun}
-            onCheckPullRequests={onCheckPullRequests}
-            pullRequests={pullRequestsByTask[task.ID]}
           />
         ))}
         {tasks.length > visibleTasks.length && (
@@ -367,7 +399,6 @@ function App() {
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null)
   const [showNewTask, setShowNewTask] = useState(false)
   const [runTaskId, setRunTaskId] = useState<number | null>(null)
-  const [pullRequestsByTask, setPullRequestsByTask] = useState<Record<number, PullRequest[]>>({})
   const [agentModal, setAgentModal] = useState<'new' | Agent | null>(null)
 
   const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useProjects()
@@ -380,7 +411,6 @@ function App() {
   const saveAgentMutation = useSaveAgent()
   const deleteAgentMutation = useDeleteAgent()
   const runTaskMutation = useRunTask(selectedProjectId)
-  const taskPullRequestsMutation = useTaskPullRequests(selectedProjectId)
 
   const columns = useMemo(() => groupByStatus(tasks), [tasks])
 
@@ -419,16 +449,6 @@ function App() {
     toast.success('Task started')
     setRunTaskId(null)
   }
-  const handleCheckPullRequests = (taskId: number) => {
-    taskPullRequestsMutation.mutate(taskId, {
-      onSuccess: (pullRequests) => {
-        setPullRequestsByTask((current) => ({ ...current, [taskId]: pullRequests }))
-        if (pullRequests.length === 0) toast.message('No pull requests available yet')
-      },
-      onError: (error) => toast.error(error.message),
-    })
-  }
-
   const handleSaveAgent = async (draft: { name: string; description: string }) => {
     if (agentModal === null) return
     const editingAgent = agentModal === 'new' ? null : agentModal
@@ -492,9 +512,8 @@ function App() {
                     key={status}
                     status={status}
                     tasks={columns[status]}
+                    projectId={selectedProjectId}
                     onRun={setRunTaskId}
-                    onCheckPullRequests={handleCheckPullRequests}
-                    pullRequestsByTask={pullRequestsByTask}
                   />
                 ))}
               </div>
@@ -502,9 +521,8 @@ function App() {
                 {activeTask ? (
                   <TaskCard
                     task={activeTask}
+                    projectId={selectedProjectId}
                     onRun={() => {}}
-                    onCheckPullRequests={() => {}}
-                    pullRequests={pullRequestsByTask[activeTask.ID]}
                     isOverlay
                   />
                 ) : null}
