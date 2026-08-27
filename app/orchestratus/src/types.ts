@@ -53,3 +53,8 @@ export interface Branch {
   protected: boolean
   last_push_date: string | null
 }
+
+export interface PullRequest {
+  number: number
+  url: string
+}

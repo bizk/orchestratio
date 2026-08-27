@@ -3,6 +3,7 @@ package openhands
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -98,4 +99,46 @@ func TestSearchRepositories(t *testing.T) {
 	if len(requestedPages) != 2 || requestedPages[0] != "" || requestedPages[1] != nextPage {
 		t.Fatalf("unexpected pagination requests: %v", requestedPages)
 	}
+}
+
+func TestGetStartTask(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/app-conversations/start-tasks" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("ids") != "start-task-1" {
+			t.Errorf("unexpected query params: %s", r.URL.RawQuery)
+		}
+		_ = json.NewEncoder(w).Encode([]StartConversationResponse{{
+			ID:                "start-task-1",
+			AppConversationID: stringPointer("conversation-1"),
+		}})
+	}))
+	defer server.Close()
+
+	svc := NewOpenHandsService("test-key", server.URL)
+	startTask, err := svc.GetStartTask(context.Background(), "start-task-1")
+	if err != nil {
+		t.Fatalf("GetStartTask: %v", err)
+	}
+	if startTask.AppConversationID == nil || *startTask.AppConversationID != "conversation-1" {
+		t.Fatalf("unexpected start task: %+v", startTask)
+	}
+}
+
+func TestGetStartTaskReturnsNotFoundForEmptyResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode([]StartConversationResponse{})
+	}))
+	defer server.Close()
+
+	svc := NewOpenHandsService("test-key", server.URL)
+	_, err := svc.GetStartTask(context.Background(), "missing-task")
+	if !errors.Is(err, ErrConversationNotFound) {
+		t.Fatalf("expected ErrConversationNotFound, got %v", err)
+	}
+}
+
+func stringPointer(value string) *string {
+	return &value
 }
