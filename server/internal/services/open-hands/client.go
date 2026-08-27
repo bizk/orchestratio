@@ -153,6 +153,21 @@ func (s *OpenHandsService) StartConversation(ctx context.Context, req StartConve
 	return &out, nil
 }
 
+// GetStartTask returns the latest state of a conversation start task.
+func (s *OpenHandsService) GetStartTask(ctx context.Context, startTaskID string) (*StartConversationResponse, error) {
+	query := url.Values{}
+	query.Add("ids", startTaskID)
+
+	var out []StartConversationResponse
+	if err := s.doJSON(ctx, http.MethodGet, "/v1/app-conversations/start-tasks", query, nil, &out); err != nil {
+		return nil, fmt.Errorf("get start task: %w", err)
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("%w: %s", ErrConversationNotFound, startTaskID)
+	}
+	return &out[0], nil
+}
+
 // SearchConversations lists sandboxed conversations.
 // GET {baseURL}/v1/app-conversations/search
 func (s *OpenHandsService) SearchConversations(ctx context.Context, params SearchConversationsParams) (*AppConversationPage, error) {

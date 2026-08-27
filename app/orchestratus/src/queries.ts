@@ -11,6 +11,7 @@ import {
   fetchBranches,
   fetchProjects,
   fetchRepositories,
+  fetchTaskPullRequests,
   fetchTasks,
   runTask,
   updateAgent,
@@ -133,5 +134,11 @@ export function useRunTask(projectId: number | null) {
       branchName: string
     }) => runTask(projectId!, taskId, agentId, repositoryName, branchName),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId!) }),
+  })
+}
+
+export function useTaskPullRequests(projectId: number | null) {
+  return useMutation({
+    mutationFn: (taskId: number) => fetchTaskPullRequests(projectId!, taskId),
   })
 }

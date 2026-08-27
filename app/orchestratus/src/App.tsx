@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import {
   Alert,
+  Anchor,
   AppShell,
   Badge,
   Button,
@@ -20,7 +21,7 @@ import {
 import { DragDropProvider, DragOverlay, useDraggable, useDroppable } from '@dnd-kit/react'
 import { toast } from 'sonner'
 import './App.css'
-import { STATUSES, STATUS_LABELS, type Agent, type Project, type Repository, type Status, type Task } from './types'
+import { STATUSES, STATUS_LABELS, type Agent, type Project, type PullRequest, type Repository, type Status, type Task } from './types'
 import {
   useAgents,
   useBranches,
@@ -30,6 +31,7 @@ import {
   useRepositories,
   useRunTask,
   useSaveAgent,
+  useTaskPullRequests,
   useTasks,
   useUpdateTaskStatus,
 } from './queries'
@@ -58,10 +60,14 @@ function groupByStatus(tasks: Task[]): Record<Status, Task[]> {
 function TaskCard({
   task,
   onRun,
+  onCheckPullRequests,
+  pullRequests,
   isOverlay = false,
 }: {
   task: Task
   onRun: (taskId: number) => void
+  onCheckPullRequests: (taskId: number) => void
+  pullRequests?: PullRequest[]
   isOverlay?: boolean
 }) {
   const { ref, isDragging } = useDraggable({
@@ -84,17 +90,27 @@ function TaskCard({
       {task.Description && <Text className="task-card-description" size="sm" c="gray.5" mt={8}>{task.Description}</Text>}
       <Group className="task-card-footer" justify="space-between" mt="md" pt="sm">
         <Text size="xs" c="dimmed">#{task.ID} · {new Date(task.DateCreated).toLocaleDateString()}</Text>
-        <Tooltip label="Choose an agent and repository to run this task" withArrow>
-          <Button
-            className="run-task-button"
-            radius="m"
-            variant="default"
-            aria-label={`Run task: ${task.Title}`}
-            onClick={() => onRun(task.ID)}
-          >
-            Run task
+        <Group gap="xs">
+          {pullRequests?.map((pullRequest) => (
+            <Anchor key={pullRequest.number} href={pullRequest.url} target="_blank" rel="noreferrer" size="sm">
+              PR #{pullRequest.number}
+            </Anchor>
+          ))}
+          <Button radius="m" variant="subtle" size="compact-sm" onClick={() => onCheckPullRequests(task.ID)}>
+            Pull requests
           </Button>
-        </Tooltip>
+          <Tooltip label="Choose an agent and repository to run this task" withArrow>
+            <Button
+              className="run-task-button"
+              radius="m"
+              variant="default"
+              aria-label={`Run task: ${task.Title}`}
+              onClick={() => onRun(task.ID)}
+            >
+              Run task
+            </Button>
+          </Tooltip>
+        </Group>
       </Group>
     </Card>
   )
@@ -304,10 +320,14 @@ function BoardColumn({
   status,
   tasks,
   onRun,
+  onCheckPullRequests,
+  pullRequestsByTask,
 }: {
   status: Status
   tasks: Task[]
   onRun: (taskId: number) => void
+  onCheckPullRequests: (taskId: number) => void
+  pullRequestsByTask: Record<number, PullRequest[]>
 }) {
   const { ref, isDropTarget } = useDroppable({ id: `status-${status}` })
 
@@ -318,7 +338,15 @@ function BoardColumn({
         <Badge variant="light">{tasks.length}</Badge>
       </Group>
       <Stack gap="sm">
-        {tasks.map((task) => <TaskCard key={task.ID} task={task} onRun={onRun} />)}
+        {tasks.map((task) => (
+          <TaskCard
+            key={task.ID}
+            task={task}
+            onRun={onRun}
+            onCheckPullRequests={onCheckPullRequests}
+            pullRequests={pullRequestsByTask[task.ID]}
+          />
+        ))}
         {tasks.length === 0 && <Text className="column-empty" size="sm" c="dimmed">No tickets</Text>}
       </Stack>
     </section>
@@ -331,6 +359,7 @@ function App() {
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null)
   const [showNewTask, setShowNewTask] = useState(false)
   const [runTaskId, setRunTaskId] = useState<number | null>(null)
+  const [pullRequestsByTask, setPullRequestsByTask] = useState<Record<number, PullRequest[]>>({})
   const [agentModal, setAgentModal] = useState<'new' | Agent | null>(null)
 
   const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useProjects()
@@ -343,6 +372,7 @@ function App() {
   const saveAgentMutation = useSaveAgent()
   const deleteAgentMutation = useDeleteAgent()
   const runTaskMutation = useRunTask(selectedProjectId)
+  const taskPullRequestsMutation = useTaskPullRequests(selectedProjectId)
 
   const columns = useMemo(() => groupByStatus(tasks), [tasks])
 
@@ -381,6 +411,16 @@ function App() {
     toast.success('Task started')
     setRunTaskId(null)
   }
+  const handleCheckPullRequests = (taskId: number) => {
+    taskPullRequestsMutation.mutate(taskId, {
+      onSuccess: (pullRequests) => {
+        setPullRequestsByTask((current) => ({ ...current, [taskId]: pullRequests }))
+        if (pullRequests.length === 0) toast.message('No pull requests available yet')
+      },
+      onError: (error) => toast.error(error.message),
+    })
+  }
+
   const handleSaveAgent = async (draft: { name: string; description: string }) => {
     if (agentModal === null) return
     const editingAgent = agentModal === 'new' ? null : agentModal
@@ -439,9 +479,28 @@ function App() {
               onDragEnd={handleDragEnd}
             >
               <div className="board-columns">
-                {STATUSES.map((status) => <BoardColumn key={status} status={status} tasks={columns[status]} onRun={setRunTaskId} />)}
+                {STATUSES.map((status) => (
+                  <BoardColumn
+                    key={status}
+                    status={status}
+                    tasks={columns[status]}
+                    onRun={setRunTaskId}
+                    onCheckPullRequests={handleCheckPullRequests}
+                    pullRequestsByTask={pullRequestsByTask}
+                  />
+                ))}
               </div>
-              <DragOverlay>{activeTask ? <TaskCard task={activeTask} onRun={() => {}} isOverlay /> : null}</DragOverlay>
+              <DragOverlay>
+                {activeTask ? (
+                  <TaskCard
+                    task={activeTask}
+                    onRun={() => {}}
+                    onCheckPullRequests={() => {}}
+                    pullRequests={pullRequestsByTask[activeTask.ID]}
+                    isOverlay
+                  />
+                ) : null}
+              </DragOverlay>
             </DragDropProvider>
           )}
           {activeTab === 'agents' && <AgentsSection agents={agents} onEdit={setAgentModal} onDelete={handleDeleteAgent} />}
