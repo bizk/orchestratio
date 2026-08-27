@@ -87,17 +87,93 @@
 }
 
 .task-card {
+  position: relative;
   cursor: grab;
-  background: #202329;
+  overflow: hidden;
+  background: linear-gradient(145deg, #22262d 0%, #1e2127 100%);
   border-color: #30343d;
   border-left: 3px solid #4b5563;
-  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgb(0 0 0 / 12%);
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
 }
 
 .task-card:hover {
-  background: #24272e;
+  background: linear-gradient(145deg, #272b33 0%, #20242b 100%);
   border-color: #4b5060;
-  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgb(0 0 0 / 20%);
+  transform: translateY(-2px);
+}
+
+.task-card-heading {
+  min-width: 0;
+}
+
+.task-card-kicker,
+.pull-request-label {
+  color: #8e96a5;
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.task-card-title {
+  display: -webkit-box;
+  overflow: hidden;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.task-card-description {
+  min-height: 4.35em;
+  line-height: 1.45;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.task-card-description-empty {
+  font-style: italic;
+}
+
+.pull-request-panel {
+  margin-top: 16px;
+  padding: 11px 12px;
+  background: rgb(16 17 19 / 36%);
+  border: 1px solid #343945;
+  border-radius: 9px;
+}
+
+.pull-request-panel-ready {
+  background: rgb(31 91 61 / 18%);
+  border-color: rgb(64 192 87 / 44%);
+}
+
+.pull-request-link {
+  width: fit-content;
+  font-weight: 650;
+}
+
+.pull-request-pulse {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  background: #4c6ef5;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgb(76 110 245 / 50%);
+  animation: pull-request-pulse 2s infinite;
+}
+
+@keyframes pull-request-pulse {
+  70% {
+    box-shadow: 0 0 0 6px rgb(76 110 245 / 0%);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgb(76 110 245 / 0%);
+  }
 }
 
 .task-card[data-status='in_progress'] {
@@ -110,14 +186,6 @@
 
 .task-card[data-status='completed'] {
   border-left-color: #40c057;
-}
-
-.task-card-title {
-  line-height: 1.35;
-}
-
-.task-card-description {
-  line-height: 1.45;
 }
 
 .task-card-footer {

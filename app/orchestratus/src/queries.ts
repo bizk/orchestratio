@@ -17,7 +17,9 @@ import {
   updateAgent,
   updateTaskStatus,
 } from './api'
-import type { Agent, Status, Task } from './types'
+import type { Agent, PullRequest, Status, Task } from './types'
+
+const PULL_REQUEST_POLL_INTERVAL = 60_000
 
 export const queryKeys = {
   projects: ['projects'] as const,
@@ -25,6 +27,7 @@ export const queryKeys = {
   agents: ['agents'] as const,
   repositories: ['repositories'] as const,
   branches: (repositoryName: string) => ['branches', repositoryName] as const,
+  taskPullRequests: (projectId: number, taskId: number) => ['task-pull-requests', projectId, taskId] as const,
 }
 
 export function useProjects() {
@@ -137,8 +140,18 @@ export function useRunTask(projectId: number | null) {
   })
 }
 
-export function useTaskPullRequests(projectId: number | null) {
-  return useMutation({
-    mutationFn: (taskId: number) => fetchTaskPullRequests(projectId!, taskId),
+export function useTaskPullRequests(
+  projectId: number | null,
+  taskId: number,
+  status: Status,
+) {
+  return useQuery<PullRequest[]>({
+    queryKey: queryKeys.taskPullRequests(projectId ?? 0, taskId),
+    queryFn: () => fetchTaskPullRequests(projectId!, taskId),
+    enabled: projectId !== null && status === 'in_progress',
+    refetchOnMount: (query) => !query.state.data?.length,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchInterval: (query) => query.state.data?.length ? false : PULL_REQUEST_POLL_INTERVAL,
   })
 }
