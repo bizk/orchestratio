@@ -34,6 +34,8 @@ import {
   useUpdateTaskStatus,
 } from './queries'
 
+const MAX_VISIBLE_TICKETS = 10
+
 const modalClassNames = {
   content: 'app-modal-content',
   header: 'app-modal-header',
@@ -310,6 +312,8 @@ function BoardColumn({
   onRun: (taskId: number) => void
 }) {
   const { ref, isDropTarget } = useDroppable({ id: `status-${status}` })
+  const visibleTasks = tasks.slice(0, MAX_VISIBLE_TICKETS)
+  const hiddenTaskCount = tasks.length - visibleTasks.length
 
   return (
     <section ref={ref} className={`column${isDropTarget ? ' column-drop-target' : ''}`}>
@@ -318,7 +322,8 @@ function BoardColumn({
         <Badge variant="light">{tasks.length}</Badge>
       </Group>
       <Stack gap="sm">
-        {tasks.map((task) => <TaskCard key={task.ID} task={task} onRun={onRun} />)}
+        {visibleTasks.map((task) => <TaskCard key={task.ID} task={task} onRun={onRun} />)}
+        {hiddenTaskCount > 0 && <Text className="column-empty" size="sm" c="dimmed">{hiddenTaskCount} more tickets</Text>}
         {tasks.length === 0 && <Text className="column-empty" size="sm" c="dimmed">No tickets</Text>}
       </Stack>
     </section>
