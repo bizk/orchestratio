@@ -15,9 +15,10 @@ import {
   fetchTasks,
   runTask,
   updateAgent,
+  updateTask,
   updateTaskStatus,
 } from './api'
-import type { Agent, PullRequest, Status, Task } from './types'
+import type { Agent, PullRequest, Status, Task, TaskDraft } from './types'
 
 const PULL_REQUEST_POLL_INTERVAL = 60_000
 
@@ -68,6 +69,21 @@ export function useCreateTask(projectId: number | null) {
         task,
         ...tasks,
       ])
+    },
+  })
+}
+
+export function useUpdateTask(projectId: number | null) {
+  const queryClient = useQueryClient()
+  const key = queryKeys.tasks(projectId ?? 0)
+
+  return useMutation({
+    mutationFn: ({ taskId, task }: { taskId: number; task: TaskDraft }) =>
+      updateTask(projectId!, taskId, task),
+    onSuccess: (updatedTask) => {
+      queryClient.setQueryData<Task[]>(key, (tasks = []) =>
+        tasks.map((task) => (task.ID === updatedTask.ID ? updatedTask : task)),
+      )
     },
   })
 }

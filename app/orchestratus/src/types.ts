@@ -28,6 +28,8 @@ export interface Task {
   DateCreated: string
 }
 
+export type TaskDraft = Pick<Task, 'Title' | 'Description' | 'Status'>
+
 export interface Agent {
   id: string
   name: string
