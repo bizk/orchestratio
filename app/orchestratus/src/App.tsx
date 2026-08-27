@@ -1,7 +1,46 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
+import {
+  Alert,
+  AppShell,
+  Badge,
+  Button,
+  Card,
+  Group,
+  Modal,
+  Select,
+  SimpleGrid,
+  Stack,
+  Tabs,
+  Text,
+  TextInput,
+  Textarea,
+  Title,
+  Tooltip,
+} from '@mantine/core'
+import { DragDropProvider, DragOverlay, useDraggable, useDroppable } from '@dnd-kit/react'
+import { toast } from 'sonner'
 import './App.css'
-import { createAgent, createTask, deleteAgent, fetchAgents,fetchBranches, fetchProjects, fetchRepositories, fetchTasks, runTask, updateAgent, updateTaskStatus } from './api'
-import { STATUSES, STATUS_LABELS, type Agent, type Branch, type Project, type Repository, type Status, type Task } from './types'
+import { STATUSES, STATUS_LABELS, type Agent, type Project, type Repository, type Status, type Task } from './types'
+import {
+  useAgents,
+  useBranches,
+  useCreateTask,
+  useDeleteAgent,
+  useProjects,
+  useRepositories,
+  useRunTask,
+  useSaveAgent,
+  useTasks,
+  useUpdateTaskStatus,
+} from './queries'
+
+const modalClassNames = {
+  content: 'app-modal-content',
+  header: 'app-modal-header',
+  title: 'app-modal-title',
+  body: 'app-modal-body',
+  close: 'app-modal-close',
+}
 
 function groupByStatus(tasks: Task[]): Record<Status, Task[]> {
   const grouped: Record<Status, Task[]> = {
@@ -18,44 +57,46 @@ function groupByStatus(tasks: Task[]): Record<Status, Task[]> {
 
 function TaskCard({
   task,
-  onDragStart,
   onRun,
+  isOverlay = false,
 }: {
   task: Task
-  onDragStart: (taskId: number) => void
   onRun: (taskId: number) => void
+  isOverlay?: boolean
 }) {
+  const { ref, isDragging } = useDraggable({
+    id: `task-${task.ID}`,
+    disabled: isOverlay,
+  })
+
   return (
-    <article
-      className="task-card"
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = 'move'
-        e.dataTransfer.setData('text/plain', String(task.ID))
-        onDragStart(task.ID)
-      }}
+    <Card
+      ref={ref}
+      className={`task-card${isDragging ? ' task-card-dragging' : ''}${isOverlay ? ' task-card-overlay' : ''}`}
+      data-status={task.Status}
+      padding="md"
+      withBorder
     >
-      <header>
-        <h3>{task.Title}</h3>
-        {task.Approved && <span className="badge-approved">Approved</span>}
-      </header>
-      {task.Description && <p>{task.Description}</p>}
-      <footer>
-        <div className="task-meta">
-          <span className="task-id">#{task.ID}</span>
-          <time dateTime={task.DateCreated}>
-            {new Date(task.DateCreated).toLocaleDateString()}
-          </time>
-        </div>
-        <button
-          type="button"
-          className="btn btn-run"
-          onClick={() => onRun(task.ID)}
-        >
-          Run
-        </button>
-      </footer>
-    </article>
+      <Group justify="space-between" align="flex-start" gap="xs" wrap="nowrap">
+        <Text className="task-card-title" fw={600} c="gray.0">{task.Title}</Text>
+        {task.Approved && <Badge color="green" variant="light">Approved</Badge>}
+      </Group>
+      {task.Description && <Text className="task-card-description" size="sm" c="gray.5" mt={8}>{task.Description}</Text>}
+      <Group className="task-card-footer" justify="space-between" mt="md" pt="sm">
+        <Text size="xs" c="dimmed">#{task.ID} · {new Date(task.DateCreated).toLocaleDateString()}</Text>
+        <Tooltip label="Choose an agent and repository to run this task" withArrow>
+          <Button
+            className="run-task-button"
+            radius="m"
+            variant="default"
+            aria-label={`Run task: ${task.Title}`}
+            onClick={() => onRun(task.ID)}
+          >
+            Run task
+          </Button>
+        </Tooltip>
+      </Group>
+    </Card>
   )
 }
 
@@ -72,7 +113,7 @@ function NewTaskModal({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
     setError(null)
@@ -84,59 +125,29 @@ function NewTaskModal({
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="New task"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2>New Task</h2>
-        <form onSubmit={handleSubmit}>
-          <label>
-            Title
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              autoFocus
-            />
-          </label>
-          <label>
-            Description
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={4}
-            />
-          </label>
-          <label>
-            Status
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as Status)}
-            >
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_LABELS[s]}
-                </option>
-              ))}
-            </select>
-          </label>
-          {error && <p className="board-error">{error}</p>}
-          <div className="modal-actions">
-            <button type="button" className="btn" onClick={onClose} disabled={submitting}>
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={submitting || !title.trim()}>
-              {submitting ? 'Creating…' : 'Create Task'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <Modal
+      opened
+      onClose={onClose}
+      title="New ticket"
+      centered
+      size="lg"
+      radius="lg"
+      classNames={modalClassNames}
+      overlayProps={{ backgroundOpacity: 0.65, blur: 3 }}
+    >
+      <form onSubmit={handleSubmit}>
+        <Stack gap="sm">
+          <TextInput label="Title" value={title} onChange={(event) => setTitle(event.currentTarget.value)} required autoFocus />
+          <Textarea label="Description" value={description} onChange={(event) => setDescription(event.currentTarget.value)} minRows={8} autosize />
+          <Select label="Status" value={status} onChange={(value) => setStatus((value ?? 'backlog') as Status)} data={STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))} />
+          {error && <Alert color="red">{error}</Alert>}
+          <Group className="app-modal-actions" justify="flex-end" pt="md">
+            <Button variant="default" onClick={onClose} disabled={submitting}>Cancel</Button>
+            <Button type="submit" loading={submitting} disabled={!title.trim()}>Create task</Button>
+          </Group>
+        </Stack>
+      </form>
+    </Modal>
   )
 }
 
@@ -154,7 +165,7 @@ function AgentModal({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
     setError(null)
@@ -166,96 +177,60 @@ function AgentModal({
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label={agent ? 'Edit agent' : 'New agent'}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2>{agent ? 'Edit Agent' : 'New Agent'}</h2>
-        <form onSubmit={handleSubmit}>
-          <label>
-            Name
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              autoFocus
-            />
-          </label>
-          <label>
-            Description
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={4}
-              required
-            />
-          </label>
-          {error && <p className="board-error">{error}</p>}
-          <div className="modal-actions">
-            <button type="button" className="btn" onClick={onClose} disabled={submitting}>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={submitting || !name.trim() || !description.trim()}
-            >
-              {submitting ? 'Saving…' : agent ? 'Save Changes' : 'Create Agent'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <Modal
+      opened
+      onClose={onClose}
+      title={agent ? 'Edit agent' : 'New agent'}
+      centered
+      size="lg"
+      radius="lg"
+      classNames={modalClassNames}
+      overlayProps={{ backgroundOpacity: 0.65, blur: 3 }}
+    >
+      <form onSubmit={handleSubmit}>
+        <Stack gap="sm">
+          <TextInput label="Name" value={name} onChange={(event) => setName(event.currentTarget.value)} required autoFocus />
+          <Textarea label="Description" value={description} onChange={(event) => setDescription(event.currentTarget.value)} minRows={8} autosize required />
+          {error && <Alert color="red">{error}</Alert>}
+          <Group className="app-modal-actions" justify="flex-end" pt="md">
+            <Button variant="default" onClick={onClose} disabled={submitting}>Cancel</Button>
+            <Button type="submit" loading={submitting} disabled={!name.trim() || !description.trim()}>
+              {agent ? 'Save changes' : 'Create agent'}
+            </Button>
+          </Group>
+        </Stack>
+      </form>
+    </Modal>
   )
 }
 
 function AgentsSection({
   agents,
-  onNew,
   onEdit,
   onDelete,
 }: {
   agents: Agent[]
-  onNew: () => void
   onEdit: (agent: Agent) => void
   onDelete: (agent: Agent) => void
 }) {
   return (
-    <section className="agents-section" aria-label="Available agents">
-      <div className="agents-header">
-        <h2>Available Agents</h2>
-        <button type="button" className="btn btn-primary" onClick={onNew}>
-          + New Agent
-        </button>
-      </div>
+    <section aria-label="Available agents">
+      <Title order={2} mb="md">Agents</Title>
       {agents.length === 0 ? (
-        <p className="agents-empty">No agents available</p>
+        <Text c="dimmed">No agents available.</Text>
       ) : (
-        <div className="agents-grid">
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
           {agents.map((agent) => (
-            <article key={agent.id} className="agent-card">
-              <h3>{agent.name}</h3>
-              <p>{agent.description}</p>
-              <footer>
-                <button type="button" className="btn" onClick={() => onEdit(agent)}>
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  onClick={() => onDelete(agent)}
-                >
-                  Delete
-                </button>
-              </footer>
-            </article>
+            <Card key={agent.id} className="agent-card" withBorder padding="md">
+              <Text className="agent-card-title" fw={600} c="gray.0">{agent.name}</Text>
+              <Text className="agent-card-description" size="sm" c="gray.5" mt={8}>{agent.description}</Text>
+              <Group className="agent-card-footer" mt="md" pt="sm" grow>
+                <Button radius="xl" variant="default" onClick={() => onEdit(agent)}>Edit agent</Button>
+                <Button radius="xl" color="red" variant="light" onClick={() => onDelete(agent)}>Delete</Button>
+              </Group>
+            </Card>
           ))}
-        </div>
+        </SimpleGrid>
       )}
     </section>
   )
@@ -276,55 +251,29 @@ function RunTaskModal({
   }) => Promise<void>
   onClose: () => void
 }) {
-  const [agents, setAgents] = useState<Agent[]>([])
   const [agentId, setAgentId] = useState('')
   const [repositoryName, setRepositoryName] = useState('')
-  const [branchList, setBranchList] = useState<{ repo: string; items: Branch[] } | null>(null)
   const [branchName, setBranchName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Fall back to the first preloaded repository until the user picks one.
   const selectedRepo = repositoryName || repositories[0]?.full_name || ''
-  const branches = branchList?.repo === selectedRepo ? branchList.items : []
+  const { data: agents = [] } = useAgents()
+  const { data: branches = [] } = useBranches(selectedRepo)
+  const selectedAgentId = agentId || agents[0]?.id || ''
+  const mainBranch = repositories.find((repository) => repository.full_name === selectedRepo)?.main_branch
+  const selectedBranchName = branchName || (
+    branches.some((branch) => branch.name === mainBranch) ? mainBranch : branches[0]?.name
+  ) || ''
 
-  useEffect(() => {
-    fetchAgents()
-      .then((list) => {
-        setAgents(list)
-        if (list.length > 0) setAgentId(list[0].id)
-      })
-      .catch((err: Error) => setError(err.message))
-  }, [])
-
-  useEffect(() => {
-    if (!selectedRepo) return
-    let cancelled = false
-    fetchBranches(selectedRepo)
-      .then((list) => {
-        if (cancelled) return
-        setBranchList({ repo: selectedRepo, items: list })
-        const main = repositories.find((r) => r.full_name === selectedRepo)?.main_branch
-        setBranchName(
-          list.some((b) => b.name === main) ? main! : (list[0]?.name ?? ''),
-        )
-      })
-      .catch((err: Error) => {
-        if (!cancelled) setError(err.message)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [selectedRepo, repositories])
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
     setError(null)
     onSubmit({
-      agentId,
+      agentId: selectedAgentId,
       repositoryName: selectedRepo,
-      branchName: branchName.trim(),
+      branchName: selectedBranchName.trim(),
     })
       .catch((err: Error) => {
         setError(err.message)
@@ -333,135 +282,82 @@ function RunTaskModal({
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Run task"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2>Run Task</h2>
-        <form onSubmit={handleSubmit}>
-          <p className="modal-task-title">{task.Title}</p>
-          <label>
-            Agent
-            <select value={agentId} onChange={(e) => setAgentId(e.target.value)}>
-              {agents.length === 0 && <option value="">No agents</option>}
-              {agents.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Repository
-            <select
-              value={selectedRepo}
-              onChange={(e) => setRepositoryName(e.target.value)}
-            >
-              {repositories.length === 0 && <option value="">No repositories</option>}
-              {repositories.map((r) => (
-                <option key={r.id} value={r.full_name}>
-                  {r.full_name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Branch
-            <select
-              value={branchName}
-              onChange={(e) => setBranchName(e.target.value)}
-            >
-              {branches.length === 0 && <option value="">Loading branches…</option>}
-              {branches.map((b) => (
-                <option key={b.name} value={b.name}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {error && <p className="board-error">{error}</p>}
-          <div className="modal-actions">
-            <button type="button" className="btn" onClick={onClose} disabled={submitting}>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={submitting || !agentId || !selectedRepo}
-            >
-              {submitting ? 'Running…' : 'Run'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <Modal opened onClose={onClose} title="Run task" centered>
+      <form onSubmit={handleSubmit}>
+        <Stack gap="sm">
+          <Text c="dimmed" size="sm">{task.Title}</Text>
+          <Select label="Agent" value={selectedAgentId} onChange={(value) => setAgentId(value ?? '')} data={agents.map((agent) => ({ value: agent.id, label: agent.name }))} placeholder="Select an agent" />
+          <Select label="Repository" value={selectedRepo} onChange={(value) => { setRepositoryName(value ?? ''); setBranchName('') }} data={repositories.map((repository) => ({ value: repository.full_name, label: repository.full_name }))} placeholder="Select a repository" />
+          <Select label="Branch" value={selectedBranchName} onChange={(value) => setBranchName(value ?? '')} data={branches.map((branch) => ({ value: branch.name, label: branch.name }))} placeholder={selectedRepo ? 'Select a branch' : 'Choose a repository first'} disabled={!selectedRepo} />
+          {error && <Alert color="red">{error}</Alert>}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={onClose} disabled={submitting}>Cancel</Button>
+            <Button type="submit" loading={submitting} disabled={!selectedAgentId || !selectedRepo || !selectedBranchName}>Run</Button>
+          </Group>
+        </Stack>
+      </form>
+    </Modal>
+  )
+}
+
+function BoardColumn({
+  status,
+  tasks,
+  onRun,
+}: {
+  status: Status
+  tasks: Task[]
+  onRun: (taskId: number) => void
+}) {
+  const { ref, isDropTarget } = useDroppable({ id: `status-${status}` })
+
+  return (
+    <section ref={ref} className={`column${isDropTarget ? ' column-drop-target' : ''}`}>
+      <Group justify="space-between" mb="sm">
+        <Text fw={700} size="sm">{STATUS_LABELS[status]}</Text>
+        <Badge variant="light">{tasks.length}</Badge>
+      </Group>
+      <Stack gap="sm">
+        {tasks.map((task) => <TaskCard key={task.ID} task={task} onRun={onRun} />)}
+        {tasks.length === 0 && <Text className="column-empty" size="sm" c="dimmed">No tickets</Text>}
+      </Stack>
+    </section>
   )
 }
 
 function App() {
-  const [projects, setProjects] = useState<Project[]>([])
   const [projectId, setProjectId] = useState<number | null>(null)
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [agents, setAgents] = useState<Agent[]>([])
-  const [repositories, setRepositories] = useState<Repository[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null)
-  const [dropTarget, setDropTarget] = useState<Status | null>(null)
+  const [activeTab, setActiveTab] = useState<string | null>('board')
+  const [activeTaskId, setActiveTaskId] = useState<number | null>(null)
   const [showNewTask, setShowNewTask] = useState(false)
   const [runTaskId, setRunTaskId] = useState<number | null>(null)
   const [agentModal, setAgentModal] = useState<'new' | Agent | null>(null)
 
-  useEffect(() => {
-    fetchProjects()
-      .then((list) => {
-        setProjects(list)
-        if (list.length > 0) setProjectId(list[0].ID)
-      })
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setLoading(false))
-
-    fetchAgents()
-      .then(setAgents)
-      .catch(() => {})
-
-    fetchRepositories()
-      .then(setRepositories)
-      .catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    if (projectId === null) return
-    fetchTasks(projectId)
-      .then((list) => {
-        setTasks(list)
-        setError(null)
-      })
-      .catch((err: Error) => setError(err.message))
-  }, [projectId])
+  const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useProjects()
+  const selectedProjectId = projectId ?? projects[0]?.ID ?? null
+  const { data: tasks = [], error: tasksError } = useTasks(selectedProjectId)
+  const { data: agents = [], error: agentsError } = useAgents()
+  const { data: repositories = [] } = useRepositories()
+  const createTaskMutation = useCreateTask(selectedProjectId)
+  const updateTaskStatusMutation = useUpdateTaskStatus(selectedProjectId)
+  const saveAgentMutation = useSaveAgent()
+  const deleteAgentMutation = useDeleteAgent()
+  const runTaskMutation = useRunTask(selectedProjectId)
 
   const columns = useMemo(() => groupByStatus(tasks), [tasks])
 
-  const handleDrop = (status: Status) => {
-    setDropTarget(null)
-    if (draggedTaskId === null || projectId === null) return
-    const task = tasks.find((t) => t.ID === draggedTaskId)
-    setDraggedTaskId(null)
-    if (!task || task.Status === status) return
-
-    // Optimistic update; revert and refetch on failure.
-    setTasks((prev) =>
-      prev.map((t) => (t.ID === task.ID ? { ...t, Status: status } : t)),
-    )
-    updateTaskStatus(projectId, task.ID, status).catch((err: Error) => {
-      setError(err.message)
-      if (projectId !== null) {
-        fetchTasks(projectId).then(setTasks).catch(() => {})
-      }
+  const handleDragEnd = (event: { canceled: boolean; operation: { source: { id: string | number } | null; target: { id: string | number } | null } }) => {
+    setActiveTaskId(null)
+    if (event.canceled) return
+    const sourceId = String(event.operation.source?.id ?? '')
+    const targetId = String(event.operation.target?.id ?? '')
+    if (!sourceId.startsWith('task-') || !targetId.startsWith('status-')) return
+    const taskId = Number(sourceId.slice(5))
+    const status = targetId.slice(7) as Status
+    const task = tasks.find((item) => item.ID === taskId)
+    if (!task || !STATUSES.includes(status) || task.Status === status) return
+    updateTaskStatusMutation.mutate({ taskId, status }, {
+      onError: (error) => toast.error(error.message),
     })
   }
 
@@ -470,9 +366,8 @@ function App() {
     Description: string
     Status: Status
   }) => {
-    if (projectId === null) return
-    const created = await createTask(projectId, task)
-    setTasks((prev) => [created, ...prev])
+    await createTaskMutation.mutateAsync(task)
+    toast.success('Task created')
     setShowNewTask(false)
   }
 
@@ -481,147 +376,83 @@ function App() {
     repositoryName: string
     branchName: string
   }) => {
-    if (projectId === null || runTaskId === null) return
-    const taskId = runTaskId
-    await runTask(projectId, taskId, opts.agentId, opts.repositoryName, opts.branchName)
-    // The server sets the task to in_progress; mirror it optimistically.
-    setTasks((prev) =>
-      prev.map((t) => (t.ID === taskId ? { ...t, Status: 'in_progress' as Status } : t)),
-    )
+    if (runTaskId === null) return
+    await runTaskMutation.mutateAsync({ taskId: runTaskId, ...opts })
+    toast.success('Task started')
     setRunTaskId(null)
   }
   const handleSaveAgent = async (draft: { name: string; description: string }) => {
     if (agentModal === null) return
-    const saved =
-      agentModal === 'new'
-        ? await createAgent(draft)
-        : await updateAgent(agentModal.id, draft)
-    setAgents((prev) =>
-      agentModal === 'new'
-        ? [...prev, saved]
-        : prev.map((a) => (a.id === saved.id ? saved : a)),
-    )
+    const editingAgent = agentModal === 'new' ? null : agentModal
+    await saveAgentMutation.mutateAsync({ agent: editingAgent, draft })
+    toast.success(editingAgent ? 'Agent updated' : 'Agent created')
     setAgentModal(null)
   }
 
   const handleDeleteAgent = (agent: Agent) => {
     if (!window.confirm(`Delete agent "${agent.name}"?`)) return
-    setError(null)
-    deleteAgent(agent.id)
-      .then(() => setAgents((prev) => prev.filter((a) => a.id !== agent.id)))
-      .catch((err: Error) => setError(err.message))
+    deleteAgentMutation.mutate(agent.id, {
+      onSuccess: () => toast.success('Agent deleted'),
+      onError: (error) => toast.error(error.message),
+    })
   }
 
   const runTaskTarget = tasks.find((t) => t.ID === runTaskId)
+  const activeTask = tasks.find((task) => task.ID === activeTaskId)
+  const error = projectsError ?? tasksError ?? agentsError
 
-  if (loading) return <p className="board-notice">Loading projects…</p>
+  if (projectsLoading) return <Text className="board-notice">Loading projects…</Text>
 
   return (
-    <main className="board">
-      <header className="board-header">
-        <h1>Kanban Board</h1>
-        <div className="board-header-actions">
-          <label>
-            Project{' '}
-            <select
-              value={projectId ?? ''}
-              onChange={(e) => {
-                const id = Number(e.target.value)
-                setProjectId(id > 0 ? id : null)
+    <AppShell header={{ height: 68 }} padding={0}>
+      <AppShell.Header className="app-shell-header">
+        <Group className="app-header" justify="space-between" h="100%">
+          <Group gap="xl">
+            <Title order={3}>Orchestratus</Title>
+            <Tabs value={activeTab} onChange={setActiveTab}>
+              <Tabs.List>
+                <Tabs.Tab value="board">Board</Tabs.Tab>
+                <Tabs.Tab value="agents">Agents</Tabs.Tab>
+              </Tabs.List>
+            </Tabs>
+          </Group>
+          {activeTab === 'board' && (
+            <Group gap="sm">
+              <Select aria-label="Project" value={selectedProjectId?.toString() ?? null} onChange={(value) => setProjectId(value ? Number(value) : null)} data={projects.map((project: Project) => ({ value: String(project.ID), label: project.Title }))} placeholder="Select project" />
+              <Button variant='gradient' disabled={selectedProjectId === null} onClick={() => setShowNewTask(true)}>New task</Button>
+            </Group>
+          )}
+          {activeTab === 'agents' && <Button variant="gradient" onClick={() => setAgentModal('new')}>New agent</Button>}
+        </Group>
+      </AppShell.Header>
+
+      <AppShell.Main>
+        <div className="page-content">
+        <Stack gap="lg">
+          {error && <Alert color="red" title="Unable to load data">{error.message}</Alert>}
+          {activeTab === 'board' && (
+            <DragDropProvider
+              onDragStart={(event) => {
+                const id = String(event.operation.source?.id ?? '')
+                setActiveTaskId(id.startsWith('task-') ? Number(id.slice(5)) : null)
               }}
+              onDragEnd={handleDragEnd}
             >
-              {projects.length === 0 && <option value="">No projects</option>}
-              {projects.map((p) => (
-                <option key={p.ID} value={p.ID}>
-                  {p.Title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={projectId === null}
-            onClick={() => setShowNewTask(true)}
-          >
-            + New Task
-          </button>
+              <div className="board-columns">
+                {STATUSES.map((status) => <BoardColumn key={status} status={status} tasks={columns[status]} onRun={setRunTaskId} />)}
+              </div>
+              <DragOverlay>{activeTask ? <TaskCard task={activeTask} onRun={() => {}} isOverlay /> : null}</DragOverlay>
+            </DragDropProvider>
+          )}
+          {activeTab === 'agents' && <AgentsSection agents={agents} onEdit={setAgentModal} onDelete={handleDeleteAgent} />}
+        </Stack>
+
+        {showNewTask && <NewTaskModal onSubmit={handleCreateTask} onClose={() => setShowNewTask(false)} />}
+        {runTaskTarget && <RunTaskModal task={runTaskTarget} repositories={repositories} onSubmit={handleRunTask} onClose={() => setRunTaskId(null)} />}
+        {agentModal !== null && <AgentModal key={agentModal === 'new' ? 'new' : agentModal.id} agent={agentModal === 'new' ? null : agentModal} onSubmit={handleSaveAgent} onClose={() => setAgentModal(null)} />}
         </div>
-      </header>
-
-      {error && <p className="board-error">{error}</p>}
-
-      <AgentsSection
-        agents={agents}
-        onNew={() => setAgentModal('new')}
-        onEdit={setAgentModal}
-        onDelete={handleDeleteAgent}
-      />
-
-      <div className="board-columns">
-        {STATUSES.map((status) => (
-          <section
-            key={status}
-            className={`column column-${status}${dropTarget === status ? ' column-drop-target' : ''}`}
-            onDragOver={(e) => {
-              e.preventDefault()
-              e.dataTransfer.dropEffect = 'move'
-              if (dropTarget !== status) setDropTarget(status)
-            }}
-            onDragLeave={() => {
-              if (dropTarget === status) setDropTarget(null)
-            }}
-            onDrop={(e) => {
-              e.preventDefault()
-              handleDrop(status)
-            }}
-          >
-            <h2>
-              {STATUS_LABELS[status]}
-              <span className="count">{columns[status].length}</span>
-            </h2>
-            <div className="column-cards">
-              {columns[status].map((task) => (
-                <TaskCard
-                  key={task.ID}
-                  task={task}
-                  onDragStart={setDraggedTaskId}
-                  onRun={setRunTaskId}
-                />
-              ))}
-              {columns[status].length === 0 && (
-                <p className="column-empty">No tickets</p>
-              )}
-            </div>
-          </section>
-        ))}
-      </div>
-
-      {showNewTask && (
-        <NewTaskModal
-          onSubmit={handleCreateTask}
-          onClose={() => setShowNewTask(false)}
-        />
-      )}
-
-      {runTaskTarget && (
-        <RunTaskModal
-          task={runTaskTarget}
-          repositories={repositories}
-          onSubmit={handleRunTask}
-          onClose={() => setRunTaskId(null)}
-        />
-      )}
-
-      {agentModal !== null && (
-        <AgentModal
-          key={agentModal === 'new' ? 'new' : agentModal.id}
-          agent={agentModal === 'new' ? null : agentModal}
-          onSubmit={handleSaveAgent}
-          onClose={() => setAgentModal(null)}
-        />
-      )}
-    </main>
+      </AppShell.Main>
+    </AppShell>
   )
 }
 
