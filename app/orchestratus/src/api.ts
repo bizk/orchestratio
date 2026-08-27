@@ -1,4 +1,4 @@
-import type { Agent, Branch, Project, PullRequest, Repository, Status, Task } from './types'
+import type { Agent, Branch, Project, PullRequest, Repository, Status, Task, TaskDraft } from './types'
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init)
@@ -29,6 +29,9 @@ export const createTask = (
   projectId: number,
   task: { Title: string; Description: string; Status: Status },
 ) => send<Task>(`/api/project/${projectId}/task`, 'POST', task)
+
+export const updateTask = (projectId: number, taskId: number, task: TaskDraft) =>
+  send<Task>(`/api/project/${projectId}/task/${taskId}`, 'PUT', task)
 
 export const updateTaskStatus = (
   projectId: number,

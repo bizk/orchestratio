@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import {
+  ActionIcon,
   Alert,
   Anchor,
   AppShell,
@@ -21,7 +22,7 @@ import {
 import { DragDropProvider, DragOverlay, useDraggable, useDroppable } from '@dnd-kit/react'
 import { toast } from 'sonner'
 import './App.css'
-import { STATUSES, STATUS_LABELS, type Agent, type Project, type Repository, type Status, type Task } from './types'
+import { STATUSES, STATUS_LABELS, type Agent, type Project, type Repository, type Status, type Task, type TaskDraft } from './types'
 import {
   useAgents,
   useBranches,
@@ -33,6 +34,7 @@ import {
   useSaveAgent,
   useTaskPullRequests,
   useTasks,
+  useUpdateTask,
   useUpdateTaskStatus,
 } from './queries'
 
@@ -70,11 +72,13 @@ function TaskCard({
   task,
   projectId,
   onRun,
+  onEdit,
   isOverlay = false,
 }: {
   task: Task
   projectId: number | null
   onRun: (taskId: number) => void
+  onEdit: (task: Task) => void
   isOverlay?: boolean
 }) {
   const { ref, isDragging } = useDraggable({
@@ -98,7 +102,20 @@ function TaskCard({
           <Text className="task-card-title" fw={650} c="gray.0">{task.Title}</Text>
         </Stack>
         <Stack align="flex-end" gap={5}>
-          <Badge color={statusBadgeColors[task.Status]} variant="light">{STATUS_LABELS[task.Status]}</Badge>
+          <Group gap="xs" wrap="nowrap">
+            <Tooltip label="Edit task" withArrow>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                radius="xl"
+                aria-label={`Edit task: ${task.Title}`}
+                onClick={() => onEdit(task)}
+              >
+                <span aria-hidden="true">✎</span>
+              </ActionIcon>
+            </Tooltip>
+            <Badge color={statusBadgeColors[task.Status]} variant="light">{STATUS_LABELS[task.Status]}</Badge>
+          </Group>
           {task.Approved && <Badge color="green" variant="outline">Approved</Badge>}
         </Stack>
       </Group>
@@ -203,6 +220,60 @@ function NewTaskModal({
     </Modal>
   )
 }
+
+function EditTaskModal({
+  task,
+  onSubmit,
+  onClose,
+}: {
+  task: Task
+  onSubmit: (task: TaskDraft) => Promise<void>
+  onClose: () => void
+}) {
+  const [title, setTitle] = useState(task.Title)
+  const [description, setDescription] = useState(task.Description)
+  const [status, setStatus] = useState<Status>(task.Status)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    setSubmitting(true)
+    setError(null)
+    onSubmit({ Title: title.trim(), Description: description.trim(), Status: status })
+      .catch((err: Error) => {
+        setError(err.message)
+        setSubmitting(false)
+      })
+  }
+
+  return (
+    <Modal
+      opened
+      onClose={onClose}
+      title="Edit task"
+      centered
+      size="lg"
+      radius="lg"
+      classNames={modalClassNames}
+      overlayProps={{ backgroundOpacity: 0.65, blur: 3 }}
+    >
+      <form onSubmit={handleSubmit}>
+        <Stack gap="sm">
+          <TextInput label="Title" value={title} onChange={(event) => setTitle(event.currentTarget.value)} required autoFocus />
+          <Textarea label="Description" value={description} onChange={(event) => setDescription(event.currentTarget.value)} minRows={8} autosize />
+          <Select label="Status" value={status} onChange={(value) => setStatus((value ?? task.Status) as Status)} data={STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))} />
+          {error && <Alert color="red">{error}</Alert>}
+          <Group className="app-modal-actions" justify="flex-end" pt="md">
+            <Button variant="default" onClick={onClose} disabled={submitting}>Cancel</Button>
+            <Button type="submit" loading={submitting} disabled={!title.trim()}>Save changes</Button>
+          </Group>
+        </Stack>
+      </form>
+    </Modal>
+  )
+}
+
 
 function AgentModal({
   agent,
@@ -358,11 +429,13 @@ function BoardColumn({
   tasks,
   projectId,
   onRun,
+  onEdit,
 }: {
   status: Status
   tasks: Task[]
   projectId: number | null
   onRun: (taskId: number) => void
+  onEdit: (task: Task) => void
 }) {
   const { ref, isDropTarget } = useDroppable({ id: `status-${status}` })
   const visibleTasks = tasks.slice(0, MAX_TICKETS_PER_COLUMN)
@@ -380,6 +453,7 @@ function BoardColumn({
             task={task}
             projectId={projectId}
             onRun={onRun}
+            onEdit={onEdit}
           />
         ))}
         {tasks.length > visibleTasks.length && (
@@ -398,6 +472,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<string | null>('board')
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null)
   const [showNewTask, setShowNewTask] = useState(false)
+  const [taskToEdit, setTaskToEdit] = useState<Task | null>(null)
   const [runTaskId, setRunTaskId] = useState<number | null>(null)
   const [agentModal, setAgentModal] = useState<'new' | Agent | null>(null)
 
@@ -407,6 +482,7 @@ function App() {
   const { data: agents = [], error: agentsError } = useAgents()
   const { data: repositories = [] } = useRepositories()
   const createTaskMutation = useCreateTask(selectedProjectId)
+  const updateTaskMutation = useUpdateTask(selectedProjectId)
   const updateTaskStatusMutation = useUpdateTaskStatus(selectedProjectId)
   const saveAgentMutation = useSaveAgent()
   const deleteAgentMutation = useDeleteAgent()
@@ -429,14 +505,17 @@ function App() {
     })
   }
 
-  const handleCreateTask = async (task: {
-    Title: string
-    Description: string
-    Status: Status
-  }) => {
+  const handleCreateTask = async (task: TaskDraft) => {
     await createTaskMutation.mutateAsync(task)
     toast.success('Task created')
     setShowNewTask(false)
+  }
+
+  const handleUpdateTask = async (task: TaskDraft) => {
+    if (taskToEdit === null) return
+    await updateTaskMutation.mutateAsync({ taskId: taskToEdit.ID, task })
+    toast.success('Task updated')
+    setTaskToEdit(null)
   }
 
   const handleRunTask = async (opts: {
@@ -514,6 +593,7 @@ function App() {
                     tasks={columns[status]}
                     projectId={selectedProjectId}
                     onRun={setRunTaskId}
+                    onEdit={setTaskToEdit}
                   />
                 ))}
               </div>
@@ -523,6 +603,7 @@ function App() {
                     task={activeTask}
                     projectId={selectedProjectId}
                     onRun={() => {}}
+                    onEdit={() => {}}
                     isOverlay
                   />
                 ) : null}
@@ -533,6 +614,7 @@ function App() {
         </Stack>
 
         {showNewTask && <NewTaskModal onSubmit={handleCreateTask} onClose={() => setShowNewTask(false)} />}
+        {taskToEdit && <EditTaskModal key={taskToEdit.ID} task={taskToEdit} onSubmit={handleUpdateTask} onClose={() => setTaskToEdit(null)} />}
         {runTaskTarget && <RunTaskModal task={runTaskTarget} repositories={repositories} onSubmit={handleRunTask} onClose={() => setRunTaskId(null)} />}
         {agentModal !== null && <AgentModal key={agentModal === 'new' ? 'new' : agentModal.id} agent={agentModal === 'new' ? null : agentModal} onSubmit={handleSaveAgent} onClose={() => setAgentModal(null)} />}
         </div>

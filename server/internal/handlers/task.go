@@ -180,19 +180,49 @@ func UpdateTask(c *gin.Context) {
 	}
 
 	var task models.Task
-	if err := c.ShouldBindJSON(&task); err != nil {
+	if err := db.Where("id = ? AND project_id = ?", taskID, projectID).First(&task).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+			return
+		}
+		fmt.Printf("failed to find task: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var req struct {
+		Title       *string        `json:"Title"`
+		Description *string        `json:"Description"`
+		Status      *models.Status `json:"Status"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	result := db.Model(&models.Task{}).Where("id = ? AND project_id = ?", taskID, projectID).Updates(&task)
-	if result.Error != nil {
-		fmt.Printf("failed to update task: %v", result.Error)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+	updates := map[string]any{}
+	if req.Title != nil {
+		updates["title"] = *req.Title
+	}
+	if req.Description != nil {
+		updates["description"] = *req.Description
+	}
+	if req.Status != nil {
+		updates["status"] = *req.Status
+	}
+	if len(updates) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "at least one task field is required"})
 		return
 	}
-	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+
+	if err := db.Model(&task).Updates(updates).Error; err != nil {
+		fmt.Printf("failed to update task: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if err := db.First(&task, task.ID).Error; err != nil {
+		fmt.Printf("failed to load updated task: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
