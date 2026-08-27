@@ -176,6 +176,7 @@ func RunTask(c *gin.Context) {
 		SelectedBranch:      branchName,
 		Title:               task.Title,
 		AgentType:           "default",
+		LLMModel:            "openai/gpt-5.6-luna",
 		SystemMessageSuffix: agent.Description,
 	})
 
