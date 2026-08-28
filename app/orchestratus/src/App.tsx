@@ -35,6 +35,7 @@ import {
   useRunTask,
   useSaveAgent,
   useSaveProject,
+  useTaskAgentResponse,
   useTaskPullRequests,
   useTasks,
   useUpdateTask,
@@ -90,6 +91,8 @@ function TaskCard({
   })
   const pullRequestQuery = useTaskPullRequests(projectId, task.ID, task.Status)
   const pullRequests = pullRequestQuery.data ?? []
+  const agentResponseQuery = useTaskAgentResponse(projectId, task.ID, task.Status)
+  const agentResponse = agentResponseQuery.data
 
   return (
     <Card
@@ -132,28 +135,38 @@ function TaskCard({
         </Text>
       )}
       {task.Status === 'in_progress' && (
-        <div className={`pull-request-panel${pullRequests.length > 0 ? ' pull-request-panel-ready' : ''}`}>
-          {pullRequests.length > 0 ? (
-            <>
-              <Text className="pull-request-label" size="xs" tt="uppercase">Pull request ready</Text>
-              <Stack gap={4} mt={5}>
-                {pullRequests.map((pullRequest) => (
-                  <Anchor key={pullRequest.number} className="pull-request-link" href={pullRequest.url} target="_blank" rel="noreferrer" size="sm">
-                    Open PR #{pullRequest.number} <span aria-hidden="true">↗</span>
-                  </Anchor>
-                ))}
-              </Stack>
-            </>
-          ) : (
-            <Group gap="xs" wrap="nowrap">
-              <span className="pull-request-pulse" aria-hidden="true" />
-              <Stack gap={1}>
-                <Text size="sm" c="gray.3">Waiting for a pull request</Text>
-                <Text size="xs" c="dimmed">We’ll check again in a minute.</Text>
-              </Stack>
-            </Group>
-          )}
-        </div>
+        <>
+          <div className={`latest-agent-response${agentResponse ? ' latest-agent-response-ready' : ''}`}>
+            <Text className="pull-request-label" size="xs" tt="uppercase">Latest agent response</Text>
+            {agentResponse ? (
+              <Text className="latest-agent-response-text" size="sm" c="gray.3" mt={5}>{agentResponse}</Text>
+            ) : (
+              <Text size="sm" c="dimmed" mt={5}>Waiting for the agent’s response.</Text>
+            )}
+          </div>
+          <div className={`pull-request-panel${pullRequests.length > 0 ? ' pull-request-panel-ready' : ''}`}>
+            {pullRequests.length > 0 ? (
+              <>
+                <Text className="pull-request-label" size="xs" tt="uppercase">Pull request ready</Text>
+                <Stack gap={4} mt={5}>
+                  {pullRequests.map((pullRequest) => (
+                    <Anchor key={pullRequest.number} className="pull-request-link" href={pullRequest.url} target="_blank" rel="noreferrer" size="sm">
+                      Open PR #{pullRequest.number} <span aria-hidden="true">↗</span>
+                    </Anchor>
+                  ))}
+                </Stack>
+              </>
+            ) : (
+              <Group gap="xs" wrap="nowrap">
+                <span className="pull-request-pulse" aria-hidden="true" />
+                <Stack gap={1}>
+                  <Text size="sm" c="gray.3">Waiting for a pull request</Text>
+                  <Text size="xs" c="dimmed">We’ll check again in a minute.</Text>
+                </Stack>
+              </Group>
+            )}
+          </div>
+        </>
       )}
       <Group className="task-card-footer" justify="space-between" align="center" mt="md" pt="sm" gap="sm" wrap="nowrap">
         <Text className="task-card-meta" size="xs" c="dimmed">Created {new Date(task.DateCreated).toLocaleDateString()}</Text>

@@ -13,6 +13,7 @@ import {
   fetchBranches,
   fetchProjects,
   fetchRepositories,
+  fetchTaskAgentResponse,
   fetchTaskPullRequests,
   fetchTasks,
   runTask,
@@ -32,6 +33,7 @@ export const queryKeys = {
   repositories: ['repositories'] as const,
   branches: (repositoryName: string) => ['branches', repositoryName] as const,
   taskPullRequests: (projectId: number, taskId: number) => ['task-pull-requests', projectId, taskId] as const,
+  taskAgentResponse: (projectId: number, taskId: number) => ['task-agent-response', projectId, taskId] as const,
 }
 
 export function useProjects() {
@@ -209,5 +211,21 @@ export function useTaskPullRequests(
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchInterval: (query) => query.state.data?.length ? false : PULL_REQUEST_POLL_INTERVAL,
+  })
+}
+
+export function useTaskAgentResponse(
+  projectId: number | null,
+  taskId: number,
+  status: Status,
+) {
+  return useQuery<string | null>({
+    queryKey: queryKeys.taskAgentResponse(projectId ?? 0, taskId),
+    queryFn: () => fetchTaskAgentResponse(projectId!, taskId),
+    enabled: projectId !== null && status === 'in_progress',
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchInterval: PULL_REQUEST_POLL_INTERVAL,
   })
 }
