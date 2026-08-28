@@ -22,16 +22,19 @@ import {
 import { DragDropProvider, DragOverlay, useDraggable, useDroppable } from '@dnd-kit/react'
 import { toast } from 'sonner'
 import './App.css'
-import { STATUSES, STATUS_LABELS, type Agent, type Project, type Repository, type Status, type Task, type TaskDraft } from './types'
+import { STATUSES, STATUS_LABELS, type Agent, type Project, type ProjectDraft, type Repository, type Status, type Task, type TaskDraft } from './types'
 import {
   useAgents,
   useBranches,
+  useCreateProject,
   useCreateTask,
   useDeleteAgent,
+  useDeleteProject,
   useProjects,
   useRepositories,
   useRunTask,
   useSaveAgent,
+  useSaveProject,
   useTaskPullRequests,
   useTasks,
   useUpdateTask,
@@ -275,6 +278,115 @@ function EditTaskModal({
 }
 
 
+function ProjectModal({
+  project,
+  onSubmit,
+  onClose,
+}: {
+  project: Project | null
+  onSubmit: (draft: ProjectDraft) => Promise<void>
+  onClose: () => void
+}) {
+  const [title, setTitle] = useState(project?.Title ?? '')
+  const [description, setDescription] = useState(project?.Description ?? '')
+  const [status, setStatus] = useState<Status>(project?.Status ?? 'backlog')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault()
+    setSubmitting(true)
+    setError(null)
+    onSubmit({ Title: title.trim(), Description: description.trim(), Status: status })
+      .catch((err: Error) => {
+        setError(err.message)
+        setSubmitting(false)
+      })
+  }
+
+  return (
+    <Modal
+      opened
+      onClose={onClose}
+      title={project ? 'Edit project' : 'New project'}
+      centered
+      size="lg"
+      radius="lg"
+      classNames={modalClassNames}
+      overlayProps={{ backgroundOpacity: 0.65, blur: 3 }}
+    >
+      <form onSubmit={handleSubmit}>
+        <Stack gap="sm">
+          <TextInput label="Name" value={title} onChange={(event) => setTitle(event.currentTarget.value)} required autoFocus />
+          <Textarea label="Description" value={description} onChange={(event) => setDescription(event.currentTarget.value)} minRows={6} autosize />
+          <Select label="Status" value={status} onChange={(value) => setStatus((value ?? 'backlog') as Status)} data={STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))} />
+          {error && <Alert color="red">{error}</Alert>}
+          <Group className="app-modal-actions" justify="flex-end" pt="md">
+            <Button variant="default" onClick={onClose} disabled={submitting}>Cancel</Button>
+            <Button type="submit" loading={submitting} disabled={!title.trim()}>
+              {project ? 'Save changes' : 'Create project'}
+            </Button>
+          </Group>
+        </Stack>
+      </form>
+    </Modal>
+  )
+}
+
+function ProjectsSection({
+  projects,
+  onEdit,
+  onDelete,
+}: {
+  projects: Project[]
+  onEdit: (project: Project) => void
+  onDelete: (project: Project) => void
+}) {
+  return (
+    <section aria-label="Projects">
+      <Group className="section-heading" justify="space-between" align="flex-end" mb="md">
+        <div>
+          <Text className="section-eyebrow" size="xs" tt="uppercase">Workspace</Text>
+          <Title order={2}>Projects</Title>
+          <Text c="dimmed" mt={5}>Keep your delivery work grouped, visible, and moving.</Text>
+        </div>
+        <Text className="section-count" size="sm" c="dimmed">{projects.length} {projects.length === 1 ? 'project' : 'projects'}</Text>
+      </Group>
+      {projects.length === 0 ? (
+        <Card className="empty-state" withBorder padding="xl">
+          <Text fw={650}>No projects yet</Text>
+          <Text c="dimmed" size="sm" mt={5}>Create your first project to start organizing tickets.</Text>
+        </Card>
+      ) : (
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
+          {projects.map((project) => (
+            <Card key={project.ID} className="project-card" withBorder padding="lg">
+              <Group justify="space-between" align="flex-start" wrap="nowrap">
+                <Stack gap={4} className="project-card-heading">
+                  <Text className="project-card-kicker" size="xs" tt="uppercase">Project #{project.ID}</Text>
+                  <Text className="project-card-title" fw={650} c="gray.0">{project.Title}</Text>
+                </Stack>
+                <Badge color={statusBadgeColors[project.Status]} variant="light">{STATUS_LABELS[project.Status]}</Badge>
+              </Group>
+              <Text className={`project-card-description${project.Description ? '' : ' project-card-description-empty'}`} size="sm" c={project.Description ? 'gray.5' : 'dimmed'} mt="md">
+                {project.Description || 'No description provided.'}
+              </Text>
+              <Group className="project-card-footer" justify="space-between" align="center" mt="lg" pt="sm" gap="sm" wrap="nowrap">
+                <Text size="xs" c="dimmed">Created {new Date(project.DateCreated).toLocaleDateString()}</Text>
+                <Group gap="xs" wrap="nowrap">
+                  <Button size="xs" radius="xl" variant="default" onClick={() => onEdit(project)}>Edit</Button>
+                  <Button size="xs" radius="xl" color="red" variant="light" onClick={() => onDelete(project)}>Delete</Button>
+                </Group>
+              </Group>
+            </Card>
+          ))}
+        </SimpleGrid>
+      )}
+    </section>
+  )
+}
+
+
 function AgentModal({
   agent,
   onSubmit,
@@ -475,6 +587,7 @@ function App() {
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null)
   const [runTaskId, setRunTaskId] = useState<number | null>(null)
   const [agentModal, setAgentModal] = useState<'new' | Agent | null>(null)
+  const [projectModal, setProjectModal] = useState<'new' | Project | null>(null)
 
   const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useProjects()
   const selectedProjectId = projectId ?? projects[0]?.ID ?? null
@@ -486,6 +599,9 @@ function App() {
   const updateTaskStatusMutation = useUpdateTaskStatus(selectedProjectId)
   const saveAgentMutation = useSaveAgent()
   const deleteAgentMutation = useDeleteAgent()
+  const createProjectMutation = useCreateProject()
+  const saveProjectMutation = useSaveProject()
+  const deleteProjectMutation = useDeleteProject()
   const runTaskMutation = useRunTask(selectedProjectId)
 
   const columns = useMemo(() => groupByStatus(tasks), [tasks])
@@ -509,6 +625,29 @@ function App() {
     await createTaskMutation.mutateAsync(task)
     toast.success('Task created')
     setShowNewTask(false)
+  }
+
+  const handleSaveProject = async (draft: ProjectDraft) => {
+    if (projectModal === null) return
+    if (projectModal === 'new') {
+      await createProjectMutation.mutateAsync(draft)
+      toast.success('Project created')
+    } else {
+      await saveProjectMutation.mutateAsync({ project: projectModal, draft })
+      toast.success('Project updated')
+    }
+    setProjectModal(null)
+  }
+
+  const handleDeleteProject = (project: Project) => {
+    if (!window.confirm(`Delete project "${project.Title}"? Its tasks will no longer be available.`)) return
+    deleteProjectMutation.mutate(project.ID, {
+      onSuccess: () => {
+        if (project.ID === selectedProjectId) setProjectId(null)
+        toast.success('Project deleted')
+      },
+      onError: (error) => toast.error(error.message),
+    })
   }
 
   const handleUpdateTask = async (task: TaskDraft) => {
@@ -559,6 +698,7 @@ function App() {
             <Tabs value={activeTab} onChange={setActiveTab}>
               <Tabs.List>
                 <Tabs.Tab value="board">Board</Tabs.Tab>
+                <Tabs.Tab value="projects">Projects</Tabs.Tab>
                 <Tabs.Tab value="agents">Agents</Tabs.Tab>
               </Tabs.List>
             </Tabs>
@@ -569,6 +709,7 @@ function App() {
               <Button variant='gradient' disabled={selectedProjectId === null} onClick={() => setShowNewTask(true)}>New task</Button>
             </Group>
           )}
+          {activeTab === 'projects' && <Button variant="gradient" onClick={() => setProjectModal('new')}>New project</Button>}
           {activeTab === 'agents' && <Button variant="gradient" onClick={() => setAgentModal('new')}>New agent</Button>}
         </Group>
       </AppShell.Header>
@@ -610,12 +751,14 @@ function App() {
               </DragOverlay>
             </DragDropProvider>
           )}
+          {activeTab === 'projects' && <ProjectsSection projects={projects} onEdit={setProjectModal} onDelete={handleDeleteProject} />}
           {activeTab === 'agents' && <AgentsSection agents={agents} onEdit={setAgentModal} onDelete={handleDeleteAgent} />}
         </Stack>
 
         {showNewTask && <NewTaskModal onSubmit={handleCreateTask} onClose={() => setShowNewTask(false)} />}
         {taskToEdit && <EditTaskModal key={taskToEdit.ID} task={taskToEdit} onSubmit={handleUpdateTask} onClose={() => setTaskToEdit(null)} />}
         {runTaskTarget && <RunTaskModal task={runTaskTarget} repositories={repositories} onSubmit={handleRunTask} onClose={() => setRunTaskId(null)} />}
+        {projectModal !== null && <ProjectModal key={projectModal === 'new' ? 'new' : projectModal.ID} project={projectModal === 'new' ? null : projectModal} onSubmit={handleSaveProject} onClose={() => setProjectModal(null)} />}
         {agentModal !== null && <AgentModal key={agentModal === 'new' ? 'new' : agentModal.id} agent={agentModal === 'new' ? null : agentModal} onSubmit={handleSaveAgent} onClose={() => setAgentModal(null)} />}
         </div>
       </AppShell.Main>

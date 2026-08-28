@@ -18,6 +18,8 @@ export interface Project {
   DateCreated: string
 }
 
+export type ProjectDraft = Pick<Project, 'Title' | 'Description' | 'Status'>
+
 export interface Task {
   ID: number
   ProjectID: number

@@ -1,4 +1,4 @@
-import type { Agent, Branch, Project, PullRequest, Repository, Status, Task, TaskDraft } from './types'
+import type { Agent, Branch, Project, ProjectDraft, PullRequest, Repository, Status, Task, TaskDraft } from './types'
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init)
@@ -17,6 +17,15 @@ function send<T>(url: string, method: string, body: unknown): Promise<T> {
 }
 
 export const fetchProjects = () => request<Project[]>('/api/project')
+
+export const createProject = (project: ProjectDraft) =>
+  send<Project>('/api/project', 'POST', project)
+
+export const updateProject = (projectId: number, project: ProjectDraft) =>
+  send<Project>(`/api/project/${projectId}`, 'PUT', project)
+
+export const deleteProject = (projectId: number) =>
+  request<{ message: string }>(`/api/project/${projectId}`, { method: 'DELETE' })
 
 export const fetchTasks = (projectId: number) =>
   request<Task[]>(`/api/project/${projectId}/task`)
