@@ -256,6 +256,69 @@
   border-top: 1px solid #30343d;
 }
 
+
+.project-card {
+  min-height: 218px;
+  background: linear-gradient(145deg, #202329 0%, #1a1c21 100%);
+  border-color: #30343d;
+  border-top: 3px solid #8257e6;
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.project-card:hover {
+  background: linear-gradient(145deg, #252932 0%, #1e2127 100%);
+  border-color: #4b5060;
+  border-top-color: #a78bfa;
+  box-shadow: 0 14px 28px rgb(0 0 0 / 22%);
+  transform: translateY(-2px);
+}
+
+.project-card-heading {
+  min-width: 0;
+}
+
+.project-card-kicker,
+.section-eyebrow {
+  color: #a78bfa;
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.project-card-title {
+  overflow: hidden;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-card-description {
+  min-height: 4.35em;
+  line-height: 1.45;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.project-card-description-empty {
+  font-style: italic;
+}
+
+.project-card-footer {
+  border-top: 1px solid #30343d;
+}
+
+.empty-state {
+  background: #191b20;
+  border-color: #30343d;
+  border-style: dashed;
+}
+
+.section-count {
+  padding-bottom: 4px;
+}
+
 @media (max-width: 760px) {
   .app-header {
     align-items: center;

@@ -5,8 +5,10 @@ import {
 } from '@tanstack/react-query'
 import {
   createAgent,
+  createProject,
   createTask,
   deleteAgent,
+  deleteProject,
   fetchAgents,
   fetchBranches,
   fetchProjects,
@@ -16,10 +18,11 @@ import {
   fetchTasks,
   runTask,
   updateAgent,
+  updateProject,
   updateTask,
   updateTaskStatus,
 } from './api'
-import type { Agent, PullRequest, Status, Task, TaskDraft } from './types'
+import type { Agent, Project, ProjectDraft, PullRequest, Status, Task, TaskDraft } from './types'
 
 const PULL_REQUEST_POLL_INTERVAL = 60_000
 
@@ -71,6 +74,43 @@ export function useCreateTask(projectId: number | null) {
         task,
         ...tasks,
       ])
+    },
+  })
+}
+
+export function useCreateProject() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: createProject,
+    onSuccess: (project) => {
+      queryClient.setQueryData<Project[]>(queryKeys.projects, (projects = []) => [project, ...projects])
+    },
+  })
+}
+
+export function useSaveProject() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ project, draft }: { project: Project; draft: ProjectDraft }) =>
+      updateProject(project.ID, draft),
+    onSuccess: (saved) => {
+      queryClient.setQueryData<Project[]>(queryKeys.projects, (projects = []) =>
+        projects.map((project) => (project.ID === saved.ID ? saved : project)),
+      )
+    },
+  })
+}
+
+export function useDeleteProject() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: deleteProject,
+    onSuccess: (_result, projectId) => {
+      queryClient.setQueryData<Project[]>(
+        queryKeys.projects,
+        (projects = []) => projects.filter((project) => project.ID !== projectId),
+      )
+      queryClient.removeQueries({ queryKey: queryKeys.tasks(projectId) })
     },
   })
 }
