@@ -38,6 +38,10 @@ export const fetchTaskAgentResponse = (projectId: number, taskId: number) =>
   request<{ response: string | null }>(`/api/project/${projectId}/task/${taskId}/agent-response`)
     .then((response) => response.response)
 
+export const fetchTaskConversation = (projectId: number, taskId: number) =>
+  request<{ url: string | null }>(`/api/project/${projectId}/task/${taskId}/conversation`)
+    .then((response) => response.url)
+
 export const createTask = (
   projectId: number,
   task: { Title: string; Description: string; Status: Status },

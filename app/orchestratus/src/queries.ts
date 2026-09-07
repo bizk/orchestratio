@@ -14,6 +14,7 @@ import {
   fetchProjects,
   fetchRepositories,
   fetchTaskAgentResponse,
+  fetchTaskConversation,
   fetchTaskPullRequests,
   fetchTasks,
   runTask,
@@ -34,6 +35,7 @@ export const queryKeys = {
   branches: (repositoryName: string) => ['branches', repositoryName] as const,
   taskPullRequests: (projectId: number, taskId: number) => ['task-pull-requests', projectId, taskId] as const,
   taskAgentResponse: (projectId: number, taskId: number) => ['task-agent-response', projectId, taskId] as const,
+  taskConversation: (projectId: number, taskId: number) => ['task-conversation', projectId, taskId] as const,
 }
 
 export function useProjects() {
@@ -227,5 +229,21 @@ export function useTaskAgentResponse(
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchInterval: PULL_REQUEST_POLL_INTERVAL,
+  })
+}
+
+export function useTaskConversation(
+  projectId: number | null,
+  taskId: number,
+  status: Status,
+) {
+  return useQuery<string | null>({
+    queryKey: queryKeys.taskConversation(projectId ?? 0, taskId),
+    queryFn: () => fetchTaskConversation(projectId!, taskId),
+    enabled: projectId !== null && status === 'in_progress',
+    refetchOnMount: (query) => query.state.data == null,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchInterval: (query) => query.state.data == null ? PULL_REQUEST_POLL_INTERVAL : false,
   })
 }
