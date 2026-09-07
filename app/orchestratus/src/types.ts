@@ -61,4 +61,5 @@ export interface Branch {
 export interface PullRequest {
   number: number
   url: string
+  merged: boolean
 }
