@@ -1,12 +1,13 @@
 // Mirrors the Go models, which serialize with their Go field names.
-export type Status = 'backlog' | 'in_progress' | 'blocked' | 'completed'
+export type Status = 'backlog' | 'in_progress' | 'blocked' | 'review' | 'completed'
 
-export const STATUSES: Status[] = ['backlog', 'in_progress', 'blocked', 'completed']
+export const STATUSES: Status[] = ['backlog', 'in_progress', 'blocked', 'review', 'completed']
 
 export const STATUS_LABELS: Record<Status, string> = {
   backlog: 'Backlog',
   in_progress: 'In Progress',
   blocked: 'Blocked',
+  review: 'Review',
   completed: 'Completed',
 }
 
