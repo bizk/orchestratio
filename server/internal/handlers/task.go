@@ -345,7 +345,7 @@ func RunTask(c *gin.Context) {
 		SelectedBranch:      branchName,
 		Title:               task.Title,
 		AgentType:           "default",
-		LLMModel:            "openai/gpt-5.6-luna",
+		LLMModel:            "openrouter/z-ai/glm-5.3-flash",
 		SystemMessageSuffix: agent.Description,
 	})
 

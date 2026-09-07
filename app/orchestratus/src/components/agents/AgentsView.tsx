@@ -1,0 +1,9 @@
+import { useEffect, useState, type ReactNode } from 'react'
+import { Alert, Button, SimpleGrid, Stack, Text, Title } from '@mantine/core'
+import { toast } from 'sonner'
+import { useAgents, useDeleteAgent, useSaveAgent } from '../../queries'
+import type { Agent } from '../../types'
+import { AgentCard } from './AgentCard'
+import { AgentModal } from './AgentModal'
+import './agents.css'
+export function AgentsView({ onHeaderActionChange }: { onHeaderActionChange: (action: ReactNode) => void }) { const [modal, setModal] = useState<'new' | Agent | null>(null); const { data: agents = [], error } = useAgents(); const save = useSaveAgent(); const remove = useDeleteAgent(); useEffect(() => { onHeaderActionChange(<Button variant="gradient" onClick={() => setModal('new')}>New agent</Button>); return () => onHeaderActionChange(null) }, [onHeaderActionChange]); const submit = async (draft: { name: string; description: string }) => { if (!modal) return; const agent = modal === 'new' ? null : modal; await save.mutateAsync({ agent, draft }); toast.success(agent ? 'Agent updated' : 'Agent created'); setModal(null) }; const deleteAgent = (agent: Agent) => { if (!window.confirm(`Delete agent "${agent.name}"?`)) return; remove.mutate(agent.id, { onSuccess: () => toast.success('Agent deleted'), onError: (err) => toast.error(err.message) }) }; return <Stack gap="lg">{error && <Alert color="red" title="Unable to load data">{error.message}</Alert>}<section aria-label="Available agents"><Title order={2} mb="md">Agents</Title>{agents.length === 0 ? <Text c="dimmed">No agents available.</Text> : <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>{agents.map((agent) => <AgentCard key={agent.id} agent={agent} onEdit={setModal} onDelete={deleteAgent} />)}</SimpleGrid>}</section>{modal && <AgentModal key={modal === 'new' ? 'new' : modal.id} agent={modal === 'new' ? null : modal} onSubmit={submit} onClose={() => setModal(null)} />}</Stack> }

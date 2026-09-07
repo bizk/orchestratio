@@ -1,0 +1,5 @@
+.agent-card { background: #202329; border-color: #30343d; border-left: 3px solid #8257e6; transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease; }
+.agent-card:hover { background: #24272e; border-color: #4b5060; transform: translateY(-1px); }
+.agent-card-title { line-height: 1.35; }
+.agent-card-description { line-height: 1.45; }
+.agent-card-footer { border-top: 1px solid #30343d; }
