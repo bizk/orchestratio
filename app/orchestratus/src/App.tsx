@@ -170,17 +170,19 @@ function TaskCard({
       )}
       <Group className="task-card-footer" justify="space-between" align="center" mt="md" pt="sm" gap="sm" wrap="nowrap">
         <Text className="task-card-meta" size="xs" c="dimmed">Created {new Date(task.DateCreated).toLocaleDateString()}</Text>
-        <Tooltip label="Choose an agent and repository to run this task" withArrow>
-          <Button
-            className="run-task-button"
-            radius="m"
-            variant="default"
-            aria-label={`Run task: ${task.Title}`}
-            onClick={() => onRun(task.ID)}
-          >
-            Run task
-          </Button>
-        </Tooltip>
+        {task.Status !== 'completed' && (
+          <Tooltip label="Choose an agent and repository to run this task" withArrow>
+            <Button
+              className="run-task-button"
+              radius="m"
+              variant="default"
+              aria-label={`Run task: ${task.Title}`}
+              onClick={() => onRun(task.ID)}
+            >
+              Run task
+            </Button>
+          </Tooltip>
+        )}
       </Group>
     </Card>
   )
