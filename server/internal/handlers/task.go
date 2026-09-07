@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
+
 	"orchestratio/internal/models"
 	openhands "orchestratio/internal/services/open-hands"
 
@@ -341,6 +343,7 @@ func RunTask(c *gin.Context) {
 		AgentID        string `json:"agentId" binding:"required"`
 		RepositoryName string `json:"repositoryName" binding:"required"`
 		BranchName     string `json:"branchName"`
+		LLMModel       string `json:"llmModel"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -358,6 +361,15 @@ func RunTask(c *gin.Context) {
 	branchName := req.BranchName
 	if branchName == "" {
 		branchName = "main"
+	}
+
+	llmModel := req.LLMModel
+	if llmModel == "" {
+		llmModel = openhands.SupportedLLMModels[0]
+	}
+	if !slices.Contains(openhands.SupportedLLMModels, llmModel) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported llmModel"})
+		return
 	}
 
 	db := c.MustGet("db").(*gorm.DB)
@@ -388,7 +400,7 @@ func RunTask(c *gin.Context) {
 		SelectedBranch:      branchName,
 		Title:               task.Title,
 		AgentType:           "default",
-		LLMModel:            "openrouter/z-ai/glm-5.3-flash",
+		LLMModel:            llmModel,
 		SystemMessageSuffix: agent.Description,
 	})
 
