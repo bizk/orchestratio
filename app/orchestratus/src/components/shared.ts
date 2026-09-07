@@ -12,5 +12,6 @@ export const statusBadgeColors: Record<Status, string> = {
   backlog: 'gray',
   in_progress: 'blue',
   blocked: 'red',
+  review: 'grape',
   completed: 'green',
 }

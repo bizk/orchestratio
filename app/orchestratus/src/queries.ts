@@ -208,7 +208,7 @@ export function useTaskPullRequests(
   return useQuery<PullRequest[]>({
     queryKey: queryKeys.taskPullRequests(projectId ?? 0, taskId),
     queryFn: () => fetchTaskPullRequests(projectId!, taskId),
-    enabled: projectId !== null && status === 'in_progress',
+    enabled: projectId !== null && (status === 'in_progress' || status === 'review'),
     refetchOnMount: (query) => !query.state.data?.length,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -224,7 +224,7 @@ export function useTaskAgentResponse(
   return useQuery<string | null>({
     queryKey: queryKeys.taskAgentResponse(projectId ?? 0, taskId),
     queryFn: () => fetchTaskAgentResponse(projectId!, taskId),
-    enabled: projectId !== null && status === 'in_progress',
+    enabled: projectId !== null && (status === 'in_progress' || status === 'review'),
     refetchOnMount: true,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -240,7 +240,7 @@ export function useTaskConversation(
   return useQuery<string | null>({
     queryKey: queryKeys.taskConversation(projectId ?? 0, taskId),
     queryFn: () => fetchTaskConversation(projectId!, taskId),
-    enabled: projectId !== null && status === 'in_progress',
+    enabled: projectId !== null && (status === 'in_progress' || status === 'review'),
     refetchOnMount: (query) => query.state.data == null,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
