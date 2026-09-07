@@ -3,6 +3,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import {
   createAgent,
   createProject,
@@ -205,15 +206,24 @@ export function useTaskPullRequests(
   taskId: number,
   status: Status,
 ) {
-  return useQuery<PullRequest[]>({
+  const queryClient = useQueryClient()
+  const query = useQuery<PullRequest[]>({
     queryKey: queryKeys.taskPullRequests(projectId ?? 0, taskId),
     queryFn: () => fetchTaskPullRequests(projectId!, taskId),
     enabled: projectId !== null && status === 'in_progress',
     refetchOnMount: (query) => !query.state.data?.length,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    refetchInterval: (query) => query.state.data?.length ? false : PULL_REQUEST_POLL_INTERVAL,
+    refetchInterval: PULL_REQUEST_POLL_INTERVAL,
   })
+
+  const merged = query.data?.some((pullRequest) => pullRequest.merged) ?? false
+  useEffect(() => {
+    // The backend marks the task completed when a PR merges; refresh the board.
+    if (merged) queryClient.invalidateQueries({ queryKey: ['tasks'] })
+  }, [merged, queryClient])
+
+  return query
 }
 
 export function useTaskAgentResponse(

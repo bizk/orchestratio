@@ -12,6 +12,7 @@ type Config struct {
 	DatabaseURL      string
 	OpenHandsAPIKey  string
 	OpenHandsBaseURL string
+	GitHubToken      string
 }
 
 func Load() (*Config, error) {
@@ -24,6 +25,7 @@ func Load() (*Config, error) {
 		DatabaseURL:      os.Getenv("DATABASE_URL"),
 		OpenHandsAPIKey:  os.Getenv("OPEN_HANDS_API_KEY"),
 		OpenHandsBaseURL: os.Getenv("OPEN_HANDS_BASE_URL"),
+		GitHubToken:      os.Getenv("GITHUB_TOKEN"),
 	}
 	if cfg.DatabaseURL == "" {
 		return nil, errors.New("DATABASE_URL is required")

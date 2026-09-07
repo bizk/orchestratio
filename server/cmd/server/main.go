@@ -5,6 +5,7 @@ import (
 	"orchestratio/internal/config"
 	"orchestratio/internal/db"
 	"orchestratio/internal/middlewares"
+	"orchestratio/internal/services/github"
 	openhands "orchestratio/internal/services/open-hands"
 	"os"
 
@@ -28,12 +29,14 @@ func main() {
 	}
 
 	openHandsService := openhands.NewOpenHandsService(config.OpenHandsAPIKey, config.OpenHandsBaseURL)
+	githubClient := github.NewClient(config.GitHubToken)
 
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 	r.Use(func(c *gin.Context) {
 		c.Set("db", db)
 		c.Set("openHandsService", openHandsService)
+		c.Set("githubClient", githubClient)
 		c.Next()
 	})
 

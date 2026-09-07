@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"orchestratio/internal/models"
+	"orchestratio/internal/services/github"
 	openhands "orchestratio/internal/services/open-hands"
 
 	"github.com/gin-gonic/gin"
@@ -71,6 +72,7 @@ func ListTasks(c *gin.Context) {
 type pullRequest struct {
 	Number int    `json:"number"`
 	URL    string `json:"url"`
+	Merged bool   `json:"merged"`
 }
 
 func GetTaskPullRequests(c *gin.Context) {
@@ -121,11 +123,40 @@ func GetTaskPullRequests(c *gin.Context) {
 		return
 	}
 
+	githubClient := c.MustGet("githubClient").(*github.Client)
+	checkMerge := task.Status != models.StatusCompleted && conversation.SelectedRepository != nil && *conversation.SelectedRepository != ""
+
 	pullRequests := make([]pullRequest, 0, len(conversation.PRNumber))
 	for _, number := range conversation.PRNumber {
-		pullRequests = append(pullRequests, pullRequest{Number: number, URL: githubPullRequestURL(conversation.SelectedRepository, number)})
+		pullRequest := pullRequest{Number: number, URL: githubPullRequestURL(conversation.SelectedRepository, number)}
+		if checkMerge {
+			merged, err := githubClient.IsPullRequestMerged(c.Request.Context(), *conversation.SelectedRepository, number)
+			if err != nil {
+				fmt.Printf("failed to check pull request merge status: %v\n", err)
+			} else {
+				pullRequest.Merged = merged
+			}
+		}
+		pullRequests = append(pullRequests, pullRequest)
 	}
+
+	// A merged pull request means the task deliverable landed, so mark it done.
+	if task.Status != models.StatusCompleted && hasMergedPullRequest(pullRequests) {
+		if err := db.Model(&task).Update("status", models.StatusCompleted).Error; err != nil {
+			fmt.Printf("failed to mark task completed: %v\n", err)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"pullRequests": pullRequests})
+}
+
+func hasMergedPullRequest(pullRequests []pullRequest) bool {
+	for _, pullRequest := range pullRequests {
+		if pullRequest.Merged {
+			return true
+		}
+	}
+	return false
 }
 
 func GetTaskConversation(c *gin.Context) {
