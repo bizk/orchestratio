@@ -15,6 +15,9 @@ func CreateAgent(c *gin.Context) {
 	var req struct {
 		Name        string `json:"name" binding:"required"`
 		Description string `json:"description" binding:"required"`
+		Color       string `json:"color"`
+		IsDefault   bool   `json:"is_default"`
+		ProjectIDs  []uint `json:"project_ids"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -24,10 +27,16 @@ func CreateAgent(c *gin.Context) {
 
 	name := req.Name
 	description := req.Description
+	color := req.Color
+	if color == "" {
+		color = "#8257e6"
+	}
 
 	agent := models.Agent{
 		Name:        name,
 		Description: description,
+		Color:       color,
+		IsDefault:   req.IsDefault,
 	}
 
 	if err := db.Create(&agent).Error; err != nil {
@@ -35,20 +44,30 @@ func CreateAgent(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, agent)
+	if err := setAgentProjects(db, &agent, req.ProjectIDs); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, buildAgentResponse(db, agent))
 }
 
 func ListAgents(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
 
 	agents := []models.Agent{}
-	err := db.Model(&models.Agent{}).Find(&agents).Error
+	err := db.Preload("Projects").Find(&agents).Error
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, agents)
+	response := make([]gin.H, 0, len(agents))
+	for _, agent := range agents {
+		response = append(response, buildAgentResponse(db, agent))
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 func GetAgentByID(c *gin.Context) {
@@ -61,13 +80,13 @@ func GetAgentByID(c *gin.Context) {
 	}
 
 	agent := models.Agent{}
-	err := db.Model(&models.Agent{}).Where("id = ?", id).First(&agent).Error
+	err := db.Preload("Projects").Model(&models.Agent{}).Where("id = ?", id).First(&agent).Error
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, agent)
+	c.JSON(http.StatusOK, buildAgentResponse(db, agent))
 }
 
 func UpdateAgent(c *gin.Context) {
@@ -90,8 +109,11 @@ func UpdateAgent(c *gin.Context) {
 	}
 
 	var req struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
+		Name        string  `json:"name"`
+		Description string  `json:"description"`
+		Color       *string `json:"color"`
+		IsDefault   *bool   `json:"is_default"`
+		ProjectIDs  *[]uint `json:"project_ids"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -105,13 +127,55 @@ func UpdateAgent(c *gin.Context) {
 	if req.Description != "" {
 		agent.Description = req.Description
 	}
+	if req.Color != nil && *req.Color != "" {
+		agent.Color = *req.Color
+	}
+	if req.IsDefault != nil {
+		agent.IsDefault = *req.IsDefault
+	}
 
 	if err := db.Save(&agent).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, agent)
+	if req.ProjectIDs != nil {
+		if err := setAgentProjects(db, &agent, *req.ProjectIDs); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, buildAgentResponse(db, agent))
+}
+
+func setAgentProjects(db *gorm.DB, agent *models.Agent, projectIDs []uint) error {
+	var projects []models.Project
+	if len(projectIDs) > 0 {
+		if err := db.Where("id IN ?", projectIDs).Find(&projects).Error; err != nil {
+			return err
+		}
+	}
+	return db.Model(agent).Association("Projects").Replace(projects)
+}
+
+func buildAgentResponse(db *gorm.DB, agent models.Agent) gin.H {
+	projectIDs := []uint{}
+	var ids []uint
+	if err := db.Table("agent_projects").Where("agent_id = ?", agent.ID).Pluck("project_id", &ids).Error; err == nil {
+		projectIDs = ids
+	}
+
+	return gin.H{
+		"id":          agent.ID,
+		"name":        agent.Name,
+		"description": agent.Description,
+		"color":       agent.Color,
+		"is_default":  agent.IsDefault,
+		"project_ids": projectIDs,
+		"created_at":  agent.CreatedAt,
+		"updated_at":  agent.UpdatedAt,
+	}
 }
 
 func DeleteAgent(c *gin.Context) {

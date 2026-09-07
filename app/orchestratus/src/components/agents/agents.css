@@ -1,5 +1,8 @@
-.agent-card { background: #202329; border-color: #30343d; border-left: 3px solid #8257e6; transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease; }
+.agent-card { background: #202329; border-color: #30343d; transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease; }
 .agent-card:hover { background: #24272e; border-color: #4b5060; transform: translateY(-1px); }
 .agent-card-title { line-height: 1.35; }
 .agent-card-description { line-height: 1.45; }
 .agent-card-footer { border-top: 1px solid #30343d; }
+.agent-card-swatch { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; }
+.app-color-swatch { width: 22px; height: 22px; border-radius: 6px; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.app-color-swatch-selected { border-color: #fff; }
