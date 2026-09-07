@@ -30,6 +30,7 @@ func RegisterRoutes(r *gin.Engine) {
 					tasks.GET("", handlers.ListTasks)
 					tasks.GET("/:taskId/pull-requests", handlers.GetTaskPullRequests)
 					tasks.GET("/:taskId/agent-response", handlers.GetTaskAgentResponse)
+					tasks.GET("/:taskId/conversation", handlers.GetTaskConversation)
 					tasks.DELETE("/:taskId", handlers.DeleteTask)
 					tasks.PUT("/:taskId", handlers.UpdateTask)
 					tasks.POST("/:taskId/run", handlers.RunTask)

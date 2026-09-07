@@ -128,6 +128,49 @@ func GetTaskPullRequests(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"pullRequests": pullRequests})
 }
 
+func GetTaskConversation(c *gin.Context) {
+	db := c.MustGet("db").(*gorm.DB)
+	projectID := c.Param("id")
+	taskID := c.Param("taskId")
+	if projectID == "" || taskID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "project ID and task ID are required"})
+		return
+	}
+
+	var task models.Task
+	if err := db.Where("id = ? AND project_id = ?", taskID, projectID).First(&task).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+			return
+		}
+		fmt.Printf("failed to get task: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	openHandsService := c.MustGet("openHandsService").(*openhands.OpenHandsService)
+	conversationID, err := resolveTaskConversationID(db, &task, openHandsService, c.Request.Context())
+	if err != nil {
+		if errors.Is(err, openhands.ErrConversationNotFound) {
+			c.JSON(http.StatusOK, gin.H{"url": nil})
+			return
+		}
+		fmt.Printf("failed to resolve OpenHands conversation: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if conversationID == nil {
+		c.JSON(http.StatusOK, gin.H{"url": nil})
+		return
+	}
+
+	url := openHandsService.ConversationURL(*conversationID)
+	if conversation, err := openHandsService.GetConversation(c.Request.Context(), *conversationID); err == nil && conversation.ConversationURL != nil && *conversation.ConversationURL != "" {
+		url = *conversation.ConversationURL
+	}
+	c.JSON(http.StatusOK, gin.H{"url": url})
+}
+
 func GetTaskAgentResponse(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
 	projectID := c.Param("id")

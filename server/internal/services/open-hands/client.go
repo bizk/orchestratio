@@ -170,6 +170,11 @@ func (s *OpenHandsService) StartConversation(ctx context.Context, req StartConve
 	return &out, nil
 }
 
+// ConversationURL returns the web UI URL for a conversation.
+func (s *OpenHandsService) ConversationURL(conversationID string) string {
+	return fmt.Sprintf("%s/conversations/%s", s.baseURL, conversationID)
+}
+
 // GetStartTask returns the latest state of a conversation start task.
 func (s *OpenHandsService) GetStartTask(ctx context.Context, startTaskID string) (*StartConversationResponse, error) {
 	query := url.Values{}
