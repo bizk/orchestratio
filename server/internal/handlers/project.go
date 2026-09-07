@@ -99,6 +99,7 @@ func UpdateProject(c *gin.Context) {
 		Title       *string        `json:"Title"`
 		Description *string        `json:"Description"`
 		Status      *models.Status `json:"Status"`
+		Color       *string        `json:"Color"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -114,6 +115,9 @@ func UpdateProject(c *gin.Context) {
 	}
 	if req.Status != nil {
 		updates["status"] = *req.Status
+	}
+	if req.Color != nil && *req.Color != "" {
+		updates["color"] = *req.Color
 	}
 	if len(updates) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "at least one project field is required"})

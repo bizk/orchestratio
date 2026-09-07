@@ -65,13 +65,18 @@ export const fetchBranches = (repositoryName: string) =>
 
 export const fetchAgents = () => request<Agent[]>('/api/agent')
 
-export const createAgent = (agent: { name: string; description: string }) =>
-  send<Agent>('/api/agent', 'POST', agent)
+export interface AgentDraft {
+  name: string
+  description: string
+  color: string
+  is_default: boolean
+  project_ids: number[]
+}
 
-export const updateAgent = (
-  id: string,
-  agent: { name: string; description: string },
-) => send<Agent>(`/api/agent/${id}`, 'PUT', agent)
+export const createAgent = (agent: AgentDraft) => send<Agent>('/api/agent', 'POST', agent)
+
+export const updateAgent = (id: string, agent: AgentDraft) =>
+  send<Agent>(`/api/agent/${id}`, 'PUT', agent)
 
 export const deleteAgent = (id: string) =>
   request<{ message: string }>(`/api/agent/${id}`, { method: 'DELETE' })

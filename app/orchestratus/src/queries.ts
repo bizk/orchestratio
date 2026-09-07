@@ -22,6 +22,7 @@ import {
   updateProject,
   updateTask,
   updateTaskStatus,
+  type AgentDraft,
 } from './api'
 import type { Agent, Project, ProjectDraft, PullRequest, Status, Task, TaskDraft } from './types'
 
@@ -158,7 +159,7 @@ export function useUpdateTaskStatus(projectId: number | null) {
 export function useSaveAgent() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ agent, draft }: { agent: Agent | null; draft: { name: string; description: string } }) =>
+    mutationFn: ({ agent, draft }: { agent: Agent | null; draft: AgentDraft }) =>
       agent ? updateAgent(agent.id, draft) : createAgent(draft),
     onSuccess: (saved) => {
       queryClient.setQueryData<Agent[]>(queryKeys.agents, (agents = []) => {

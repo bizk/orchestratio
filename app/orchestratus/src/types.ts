@@ -14,11 +14,12 @@ export interface Project {
   ID: number
   Title: string
   Status: Status
+  Color: string
   Description: string
   DateCreated: string
 }
 
-export type ProjectDraft = Pick<Project, 'Title' | 'Description' | 'Status'>
+export type ProjectDraft = Pick<Project, 'Title' | 'Description' | 'Status' | 'Color'>
 
 export interface Task {
   ID: number
@@ -36,6 +37,9 @@ export interface Agent {
   id: string
   name: string
   description: string
+  color: string
+  is_default: boolean
+  project_ids: number[]
   created_at: string
   updated_at: string
 }
