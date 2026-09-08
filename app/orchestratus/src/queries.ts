@@ -23,6 +23,7 @@ import {
   updateTask,
   updateTaskStatus,
 } from './api'
+import type { LLMModel } from './api'
 import type { Agent, Project, ProjectDraft, PullRequest, Status, Task, TaskDraft } from './types'
 
 const PULL_REQUEST_POLL_INTERVAL = 60_000
@@ -190,12 +191,14 @@ export function useRunTask(projectId: number | null) {
       agentId,
       repositoryName,
       branchName,
+      llmModel,
     }: {
       taskId: number
       agentId: string
       repositoryName: string
       branchName: string
-    }) => runTask(projectId!, taskId, agentId, repositoryName, branchName),
+      llmModel: LLMModel
+    }) => runTask(projectId!, taskId, agentId, repositoryName, branchName, llmModel),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId!) }),
   })
 }

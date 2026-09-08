@@ -16,6 +16,12 @@ import (
 
 var ErrConversationNotFound = errors.New("conversation not found")
 
+// Supported LLM models selectable when running a task.
+var SupportedLLMModels = []string{
+	"openrouter/z-ai/glm-5.3-flash",
+	"openai/gpt-5-mini",
+}
+
 type OpenHandsService struct {
 	apiKey     string
 	baseURL    string

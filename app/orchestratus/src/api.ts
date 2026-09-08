@@ -76,15 +76,26 @@ export const updateAgent = (
 export const deleteAgent = (id: string) =>
   request<{ message: string }>(`/api/agent/${id}`, { method: 'DELETE' })
 
+export type LLMModel = 'openrouter/z-ai/glm-5.3-flash' | 'openai/gpt-5-mini'
+
+export const LLM_MODELS: { value: LLMModel; label: string }[] = [
+  { value: 'openrouter/z-ai/glm-5.3-flash', label: 'OpenRouter — GLM 4.5 Flash (z-ai)' },
+  { value: 'openai/gpt-5-mini', label: 'OpenAI — GPT-5 Mini' },
+]
+
+export const DEFAULT_LLM_MODEL: LLMModel = LLM_MODELS[0].value
+
 export const runTask = (
   projectId: number,
   taskId: number,
   agentId: string,
   repositoryName: string,
   branchName?: string,
+  llmModel: LLMModel = DEFAULT_LLM_MODEL,
 ) =>
   send<unknown>(`/api/project/${projectId}/task/${taskId}/run`, 'POST', {
     agentId,
     repositoryName,
     branchName,
+    llmModel,
   })
